@@ -1,149 +1,382 @@
 from document import Document
+from op import Op
 import unittest
 
 
 class TestSimpleNodeOperations(unittest.TestCase):
 
     def setUp(self):
-        self.doc = Document()
-        self.doc.content = {'first': 'some string',
+        self.doc0 = Document()
+        self.doc1 = Document()
+        self.doc1.snapshot = {'first': 'some string',
                             'second': {'third':'more string',
                                        'fourth':{'numb':55}},
                             'fifth': [55,66,{'sixth': 'deep string'}, 'rw']}
+        self.doc2 = Document()
+        self.doc2.snapshot = [{'name':'value'},
+                              [1,2,3,4],
+                              'normal, ol string',
+                              [['multi'],['dimen'],['array']],
+                              True,
+                              None,
+                              42]
+        self.doc3 = Document()
+        self.doc3.snapshot = 'ABCDEFG'
+        
+    # Testing that Document can tell if a path is valid in its
+    # snapshot without throwing any exceptions
+    def test_contains_path(self):
+        doc0 = self.doc0
+        doc1 = self.doc1
+        doc2 = self.doc2
+        doc3 = self.doc3
 
-    def test_insert_pair(self):
-        self.doc.content = {}
-        d1 = {'key': 'first',
-              'value': 'some string',
-              'node': ''}
-        result1 = {'first': 'some string'}
+        # all documents have a root (empty path)
+        path1 = []
+        self.assertTrue(doc0.contains_path(path1))
+        self.assertTrue(doc1.contains_path(path1))
+        self.assertTrue(doc2.contains_path(path1))
 
-        d2 = {'key': 'second',
-              'value': {},
-              'node': ''}
-        result2 = {'first': 'some string', 'second':{}}
+        path2 = ['first']
+        self.assertEqual(doc0.contains_path(path2), False)
+        self.assertTrue(doc1.contains_path(path2))
 
-        d3 = {'key': 'third',
-              'value': 'more string',
-              'node': 'second'}
-        result3 = {'first': 'some string', 'second':{'third':'more string'}}
+        path3 = ['second','fourth','numb']
+        self.assertTrue(doc1.contains_path(path3))
+        
+        path4 = ['fifth',2,'sixth']
+        self.assertTrue(doc1.contains_path(path4))
 
-        self.doc.insert_pair(d1)
-        self.assertEqual(self.doc.content, result1)
-        self.doc.insert_pair(d2)
-        self.assertEqual(self.doc.content, result2)
-        self.doc.insert_pair(d3)
-        self.assertEqual(self.doc.content, result3)
+        # final key is not valid
+        path5 = ['fifth',2,'deep string']
+        self.assertEqual(doc1.contains_path(path5), False)
 
-    def test_remove_pair(self):
-        c1 = {'node': '', 'key':'first'}
-        result1 = {'second': {'third':'more string',
-                              'fourth':{'numb':55}},
-                    'fifth': [55,66,{'sixth': 'deep string'}, 'rw']}
+        # middle key is not valid
+        path6 = ['second','first','numb']
+        self.assertEqual(doc1.contains_path(path6), False)
 
-        c2 = {'node': 'second,fourth', 'key':'numb'}
-        result2 = {'second': {'third':'more string',
-                              'fourth':{}},
-                    'fifth': [55,66,{'sixth': 'deep string'}, 'rw']}
+        # 4 is one out of path
+        path7 = ['second','fifth',4]
+        self.assertEqual(doc1.contains_path(path7), False)
+        
+        # path can only be number when looking at list
+        path8 = [0]
+        self.assertEqual(doc0.contains_path(path8), False)
+        self.assertEqual(doc1.contains_path(path8), False)
+        self.assertEqual(doc2.contains_path(path8), True)
 
-        self.doc.remove_pair(c1)
-        self.assertEqual(self.doc.content, result1)
-        self.doc.remove_pair(c2)
-        self.assertEqual(self.doc.content, result2)
+        path9 = [3,2]
+        self.assertTrue(doc2.contains_path(path9))
 
-    def test_find_node(self):
-        pos1 = ''
-        pos2 = 'first'
-        pos3 = 'second'
-        pos4 = 'second,third'
-        pos5 = 'fifth,1'
-        pos6 = 'fifth,2,sixth'
-        pos7 = 'fifth,3'
+        # This snapshot is just a string. Should have no path but
+        # root.
+        path10 = [3]
+        self.assertEqual(doc3.contains_path(path10), False)
 
-        self.assertEqual(self.doc.find_node(pos1), self.doc.content)
-        self.assertEqual(self.doc.find_node(pos2),'some string')
-        self.assertEqual(self.doc.find_node(pos3),
+    # Testing the a document can get the value at the given
+    # path. First some tests on deep nesting, then testing weirder
+    # values like True or None (null in json)
+    def test_get_node(self):
+        doc0 = self.doc0
+        doc1 = self.doc1
+        doc2 = self.doc2
+        
+        path1 = []
+        self.assertEqual(doc0.get_node(path1), {})
+        self.assertEqual(doc1.get_node(path1), doc1.snapshot)
+        self.assertEqual(doc2.get_node(path1), doc2.snapshot)
+        
+        path2 = ['first']
+        self.assertEqual(doc1.get_node(path2),'some string')
+
+        path3 = ['second']
+        self.assertEqual(doc1.get_node(path3),
                          {'third':'more string',
-                         'fourth':{'numb':55}})
-        self.assertEqual(self.doc.find_node(pos4), 'more string')
-        self.assertEqual(self.doc.find_node(pos5), 66)
-        self.assertEqual(self.doc.find_node(pos6), 'deep string')
-        self.assertEqual(self.doc.find_node(pos7), 'rw')
+                          'fourth':{'numb':55}})
 
-    def test_insert_into_array(self):
-        d1 = {'value':44,
-              'pos':0,
-              'node':'fifth'}
+        path4 = ['second','fourth','numb']
+        self.assertEqual(doc1.get_node(path4), 55)
+
+        path5 = ['fifth',2,'sixth']
+        self.assertEqual(doc1.get_node(path5), 'deep string')
+
+        path6 = [0, 'name']
+        self.assertEqual(doc2.get_node(path6), 'value')
+
+        path7 = [3,1,0]
+        self.assertEqual(doc2.get_node(path7), 'dimen')
+
+        path8 = [1,3]
+        self.assertEqual(doc2.get_node(path8), 4)
+
+        path9 = [4]
+        self.assertEqual(doc2.get_node(path9), True)
+
+        path10 = [5]
+        self.assertEqual(doc2.get_node(path10), None)
+
+    def test_set_value(self):
+        doc0 = self.doc0
+        doc1 = self.doc1
+        doc2 = self.doc2
+
+        # change value type of whole document
+        doc0.apply_op(Op('set', [], val='ABCDEFG'))
+        self.assertEqual(doc0.snapshot, 'ABCDEFG')
+        doc0.apply_op(Op('set', [], val=None))
+        self.assertEqual(doc0.snapshot, None)        
+        doc0.apply_op(Op('set', [], val=False))
+        self.assertEqual(doc0.snapshot, False)
+
+        # simple, first level dict key/val change
+        op1 = Op('set', [], key='first', val='newval')
+        doc1.apply_op(op1)
+        self.assertEqual(doc1.get_node(['first']), 'newval')
+
+        # nested dicts
+        op2 = Op('set', ['second'], key='third', val=99)
+        doc1.apply_op(op2)
+        self.assertEqual(doc1.get_node(['second','third']), 99)
+        # nested dicts with list index as key
+        op3 = Op('set', ['fifth'], key=1, val=42)
+        doc1.apply_op(op3)
+        self.assertEqual(doc1.get_node(['fifth',1]), 42)
+
+        #nested dict with list index in path
+        op4 = Op('set', ['fifth',2], key='sixth', val={'a':1})
+        doc1.apply_op(op4)
+        self.assertEqual(doc1.get_node(['fifth',2,'sixth']), {'a':1})
+
+        # traversing lists
+        op5 = Op('set', [3,2], key=0, val=5)
+        doc2.apply_op(op5)
+        self.assertEqual(doc2.get_node([3,2,0]), 5)
+
+    def test_boolean_negation(self):
+        doc0 =  Document()
+        doc0.snapshot = False
+        doc1 = self.doc1
+        doc2 = self.doc2
+
+        # whole document is a boolean. Just change that
+        op1 = Op('bn', [])
+        doc0.apply_op(op1)
+        self.assertEqual(doc0.snapshot, True)
+        doc0.apply_op(op1)
+        self.assertEqual(doc0.snapshot, False)
+
+        # boolean at some key/index
+        op2 = Op('bn', [], key=4)
+        doc2.apply_op(op2)
+        self.assertEqual(doc2.get_value([],key=4), False)
+        doc2.apply_op(op2)
+        self.assertEqual(doc2.get_value([],key=4), True)
+
+        # boolean along some path
+        path3 = ['fifth',2]
+        doc1.apply_op(Op('set', path3, key='sixth', val=True))
+        op3 = Op('bn', path3, key='sixth')
+        doc1.apply_op(op3)
+        self.assertEqual(doc1.get_value(path3, key='sixth'), False)
+        doc1.apply_op(op3)
+        self.assertEqual(doc1.get_value(path3, key='sixth'), True)
+
+    def test_number_add(self):
+        doc0 =  Document()
+        doc0.snapshot = 0
+        doc1 = self.doc1
+        doc2 = self.doc2
+
+        # whole document is just a number. Alter it.
+        op1 = Op('na', [], val=5)
+        doc0.apply_op(op1)
+        self.assertEqual(doc0.snapshot, 5)
+
+        # number deeper in doc
+        op2 = Op('na', ['fifth'], key=1, val=-100)
+        doc1.apply_op(op2)
+        self.assertEqual(doc1.get_value(['fifth'], key=1), -34)
+
+        # funkier numbers accepted by JSON
+        # int frac
+        op3 = Op('na', ['fifth'], key=1, val=34.5)
+        doc1.apply_op(op3)
+        self.assertEqual(doc1.get_value(['fifth'], key=1), 0.5)
+
+    def test_string_insert(self):
+        doc1 = self.doc1
+        doc2 = self.doc2
+        doc3 = self.doc3
+        
+        # whole object is just a string. alter it
+        # add string to end
+        op1 = Op('si', [], val='end', offset=7)
+        doc3.apply_op(op1)
+        self.assertEqual(doc3.snapshot, 'ABCDEFGend')
+        # insert in middle
+        op2 = Op('si', [], val=' word ', offset=3)
+        doc3.apply_op(op2)
+        self.assertEqual(doc3.snapshot, 'ABC word DEFGend')
+        # insert at start
+        op3 = Op('si', [], val='start', offset=0)
+        doc3.apply_op(op3)
+        self.assertEqual(doc3.snapshot, 'startABC word DEFGend')
+
+        # something in nested dict
+        op4 = Op('si', [3,1], key=0, offset=5, val='sional')
+        doc2.apply_op(op4)
+        self.assertEqual(doc2.get_value([3,1], key=0), 'dimensional')
+
+    def test_string_delete(self):
+        doc1 = self.doc1
+        doc2 = self.doc2
+        doc3 = self.doc3
+
+        # whole doc is just a string. alter it
+        # delete last character
+        op1 = Op('sd', [], val=1, offset=6)
+        doc3.apply_op(op1)
+        self.assertEqual(doc3.snapshot, 'ABCDEF')
+        # delete in middle
+        op2 = Op('sd', [], val=2, offset=3)
+        doc3.apply_op(op2)
+        self.assertEqual(doc3.snapshot, 'ABCF')
+        # delete first two letters
+        op3 = Op('sd', [], val=2, offset=0)
+        doc3.apply_op(op3)
+        self.assertEqual(doc3.snapshot, 'CF')
+
+        # something deep in doc
+        op4 = Op('sd', [3,1], key=0, val=2, offset=3)
+        doc2.apply_op(op4)
+        self.assertEqual(doc2.get_value([3,1], key=0), 'dim')
+
+    def test_array_insert(self):
+        doc0 =  Document()
+        doc0.snapshot = []
+        doc1 = self.doc1
+        doc2 = self.doc2
+
+        # whole doc is just an empty array. alter it
+        op1 = Op('ai', [], val='c', offset=0)
+        doc0.apply_op(op1)
+        self.assertEqual(doc0.snapshot, ['c'])
+        # insert at start
+        op2 = Op('ai', [], val='a', offset=0)
+        doc0.apply_op(op2)
+        self.assertEqual(doc0.snapshot, ['a', 'c'])
+        # insert at end
+        op3 = Op('ai', [], val='d', offset=2)
+        doc0.apply_op(op3)
+        self.assertEqual(doc0.snapshot, ['a','c','d'])
+        # insert in middle
+        op4 = Op('ai', [], val='b', offset=1)
+        doc0.apply_op(op4)
+        self.assertEqual(doc0.snapshot, ['a','b','c','d'])
+
+        # insert into some array deep in doc
+        op5 = Op('ai', [3], key=1, val='a', offset=1)
+        doc2.apply_op(op5)
+        self.assertEqual(doc2.get_value([3], key=1), ['dimen', 'a'])
+
+        # again
+        op6 = Op('ai', [], key='fifth', val='a', offset=1)
+        doc1.apply_op(op6)
+        self.assertEqual(doc1.get_value(['fifth'], key=1), 'a')
+
+    def test_array_delete(self):
+        doc0 =  Document()
+        doc0.snapshot = []
+        doc1 = self.doc1
+        doc2 = self.doc2
+
+        # can technically delete nothing from empty list. why not
+        op1 = Op('ad', [], offset=0, val=0)
+        doc0.apply_op(op1)
+        self.assertEqual(doc0.snapshot, [])
+
+        # remove one from list
+        op2 = Op('ad', [], offset=1, val=1)
+        doc2.apply_op(op2)
+        self.assertEqual(doc2.get_value([], key=1), 'normal, ol string')
+
+        # from nested lists
+        op3 = Op('ad', [], key=2, offset=1, val=1)
+        doc2.apply_op(op3)
+        self.assertEqual(doc2.get_value([], key=2), [['multi'],['array']])
+
+        # delete multiple elements
+        op4 = Op('ad', [], offset=0, val=4)
+        doc2.apply_op(op4)
+        self.assertEqual(doc2.snapshot, [None, 42])
+
+        # delete last in list:
+        op5 = Op('ad', [], offset=1, val=1)
+        doc2.apply_op(op5)
+        self.assertEqual(doc2.snapshot, [None])
+
+        # in dicts
+        op6 = Op('ad', [], key='fifth', offset=2, val=2)
+        doc1.apply_op(op6)
+        self.assertEqual(doc1.get_value([], key='fifth'), [55,66])
+
+    def test_array_move(self):
+        doc1 = self.doc1
+        doc2 = self.doc2
+
+        # simple move at root list
+        op1 = Op('am', [], offset=2, val=1)
+        doc2.apply_op(op1)
+        result1 = [{'name':'value'},'normal, ol string', [1,2,3,4],
+                   [['multi'],['dimen'],['array']], True, None,42]
+        self.assertEqual(doc2.snapshot, result1)
+
+        # Move to end of list
+        op2 = Op('am', [], key='fifth', offset=0, val=3)
+        doc1.apply_op(op2)
+        result2 = [66,{'sixth': 'deep string'}, 'rw', 55]
+        self.assertEqual(doc1.get_value([], key='fifth'), result2)
+
+    def test_object_insert(self):
+        doc0 = self.doc0
+        doc1 = self.doc1
+        doc2 = self.doc2
+
+        # whole doc is a dict. insert a key val pair
+        kv1 = {'key':'a', 'val':1}
+        kv1 = {'key':'a', 'val':1}
+        op1 = Op('oi', [], val=kv1)
+        doc0.apply_op(op1)
+        self.assertEqual(doc0.snapshot, {'a':1})
+        kv2 = {'key':'b', 'val':2}
+        op2 = Op('oi', [], val=kv2)
+        doc0.apply_op(op2)
+        self.assertEqual(doc0.snapshot, {'a':1, 'b':2})
+
+        # nested dicts
+        op3 = Op('oi', ['fifth'], key=2, val=kv1)
+        doc1.apply_op(op3)
+        result3 = {'sixth': 'deep string', 'a': 1}
+        self.assertEqual(doc1.get_value(['fifth'], key=2), result3)
+
+    def test_object_delete(self):
+        doc1 = self.doc1
+        doc2 = self.doc2
+
+        #simple delete
+        op1 = Op('od', [], offset='second')
+        doc1.apply_op(op1)
         result1 = {'first': 'some string',
-                   'second': {'third':'more string',
-                              'fourth':{'numb':55}},
-                              'fifth':[44,55,66,{'sixth': 'deep string'}, 'rw']}
-
-        d2 = {'value':{'inserted':'node'},
-              'pos':4,
-              'node':'fifth'}
-        result2 = {'first': 'some string',
-                   'second': {'third':'more string',
-                              'fourth':{'numb':55}},
-                    'fifth':[44,55,66,
-                             {'sixth': 'deep string'},
-                             {'inserted': 'node'}, 'rw']}
-
-        self.doc.insert_into_array(d1)
-        self.assertEqual(self.doc.content, result1)
-        self.doc.insert_into_array(d2)
-        self.assertEqual(self.doc.content, result2)
-
-    def test_remove_from_array(self):
-        c1 = {'pos':2, 'node':'fifth'}
-        result1 = {'first': 'some string',
-                   'second': {'third':'more string',
-                              'fourth':{'numb':55}},
-                    'fifth': [55,66,'rw']}
-
-        c2 = {'pos':2, 'node':'fifth'}
-        result2 = {'first': 'some string',
-                   'second': {'third':'more string',
-                              'fourth':{'numb':55}},
-                    'fifth': [55,66]}
-
-        c3 = {'pos':0, 'node':'fifth'}
-        result3 = {'first': 'some string',
-                   'second': {'third':'more string',
-                              'fourth':{'numb':55}},
-                    'fifth': [66]}
-        c4 = {'pos':0, 'node':'fifth'}
-        result4 = {'first': 'some string',
-                   'second': {'third':'more string',
-                              'fourth':{'numb':55}},
-                    'fifth': []}
-
-        self.doc.remove_from_array(c1)
-        self.assertEqual(self.doc.content, result1)
-        self.doc.remove_from_array(c2)
-        self.assertEqual(self.doc.content, result2)
-        self.doc.remove_from_array(c3)
-        self.assertEqual(self.doc.content, result3)
-        self.doc.remove_from_array(c4)
-        self.assertEqual(self.doc.content, result4)
-
-    def test_change_key(self):
-        c1 = {'node': '', 'key':'first', 'new_key':'changed_key_here'}
-        result1 = {'changed_key_here': 'some string',
-                   'second': {'third':'more string',
-                              'fourth':{'numb':55}},
                    'fifth': [55,66,{'sixth': 'deep string'}, 'rw']}
+        self.assertEqual(doc1.snapshot, result1)
 
-        c2 = {'node': 'fifth,2', 'key':'sixth', 'new_key':'seventh'}
-        result2 = {'changed_key_here': 'some string',
-                   'second': {'third':'more string',
-                              'fourth':{'numb':55}},
-                   'fifth': [55,66,{'seventh': 'deep string'}, 'rw']}
-
-        self.doc.change_key(c1)
-        self.assertEqual(self.doc.content, result1)
-        self.doc.change_key(c2)
-        self.assertEqual(self.doc.content, result2)
+        # nested
+        op2 = Op('od', ['fifth'], key=2, offset='sixth')
+        doc1.apply_op(op2)
+        result2 = {'first': 'some string',
+                   'fifth': [55,66,{}, 'rw']}
+        self.assertEqual(doc1.snapshot, result2)
+        
 
 if __name__ == '__main__':
     unittest.main()
