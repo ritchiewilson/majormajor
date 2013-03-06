@@ -7,20 +7,25 @@ class Op:
     offset is only used for string manipulation
     
     """
-    def __init__(self, action, path, key=None, val=None, offset=None):
+    def __init__(self, action, path, val=None, offset=None):
         self.action = action
         self.path = path
-        self.key = key
         self.val = val
         self.offset = offset
 
 
     def to_jsonable(self):
         s = [{'action': self.action}, {'path': self.path}]
-        if self.key!=None:
-            s.append({'key': self.key})
         if self.val!=None:
             s.append({'val': self.val})
         if self.offset!=None:
             s.append({'offset': self.offset})
+        return s
+
+    def to_dict(self):
+        s = {'action': self.action, 'path': self.path}
+        if self.val!=None:
+            s['val'] = self.val
+        if self.offset!=None:
+            s['offset'] = self.offset
         return s

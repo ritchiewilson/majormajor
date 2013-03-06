@@ -76,7 +76,7 @@ class TestSimpleNodeOperations(unittest.TestCase):
     # Testing the a document can get the value at the given
     # path. First some tests on deep nesting, then testing weirder
     # values like True or None (null in json)
-    def test_get_node(self):
+    def test_get_value(self):
         doc0 = self.doc0
         doc1 = self.doc1
         doc2 = self.doc2
@@ -87,33 +87,33 @@ class TestSimpleNodeOperations(unittest.TestCase):
         self.assertEqual(doc2.get_node(path1), doc2.snapshot)
         
         path2 = ['first']
-        self.assertEqual(doc1.get_node(path2),'some string')
+        self.assertEqual(doc1.get_value(path2),'some string')
 
         path3 = ['second']
-        self.assertEqual(doc1.get_node(path3),
+        self.assertEqual(doc1.get_value(path3),
                          {'third':'more string',
                           'fourth':{'numb':55}})
 
         path4 = ['second','fourth','numb']
-        self.assertEqual(doc1.get_node(path4), 55)
+        self.assertEqual(doc1.get_value(path4), 55)
 
         path5 = ['fifth',2,'sixth']
-        self.assertEqual(doc1.get_node(path5), 'deep string')
+        self.assertEqual(doc1.get_value(path5), 'deep string')
 
         path6 = [0, 'name']
-        self.assertEqual(doc2.get_node(path6), 'value')
+        self.assertEqual(doc2.get_value(path6), 'value')
 
         path7 = [3,1,0]
-        self.assertEqual(doc2.get_node(path7), 'dimen')
+        self.assertEqual(doc2.get_value(path7), 'dimen')
 
         path8 = [1,3]
-        self.assertEqual(doc2.get_node(path8), 4)
+        self.assertEqual(doc2.get_value(path8), 4)
 
         path9 = [4]
-        self.assertEqual(doc2.get_node(path9), True)
+        self.assertEqual(doc2.get_value(path9), True)
 
         path10 = [5]
-        self.assertEqual(doc2.get_node(path10), None)
+        self.assertEqual(doc2.get_value(path10), None)
 
     def test_set_value(self):
         doc0 = self.doc0
@@ -129,28 +129,28 @@ class TestSimpleNodeOperations(unittest.TestCase):
         self.assertEqual(doc0.snapshot, False)
 
         # simple, first level dict key/val change
-        op1 = Op('set', [], key='first', val='newval')
+        op1 = Op('set', ['first'], val='newval')
         doc1.apply_op(op1)
-        self.assertEqual(doc1.get_node(['first']), 'newval')
+        self.assertEqual(doc1.get_value(['first']), 'newval')
 
         # nested dicts
-        op2 = Op('set', ['second'], key='third', val=99)
+        op2 = Op('set', ['second','third'], val=99)
         doc1.apply_op(op2)
-        self.assertEqual(doc1.get_node(['second','third']), 99)
+        self.assertEqual(doc1.get_value(['second','third']), 99)
         # nested dicts with list index as key
-        op3 = Op('set', ['fifth'], key=1, val=42)
+        op3 = Op('set', ['fifth', 1], val=42)
         doc1.apply_op(op3)
-        self.assertEqual(doc1.get_node(['fifth',1]), 42)
+        self.assertEqual(doc1.get_value(['fifth',1]), 42)
 
         #nested dict with list index in path
-        op4 = Op('set', ['fifth',2], key='sixth', val={'a':1})
+        op4 = Op('set', ['fifth',2,'sixth'], val={'a':1})
         doc1.apply_op(op4)
-        self.assertEqual(doc1.get_node(['fifth',2,'sixth']), {'a':1})
+        self.assertEqual(doc1.get_value(['fifth',2,'sixth']), {'a':1})
 
         # traversing lists
-        op5 = Op('set', [3,2], key=0, val=5)
+        op5 = Op('set', [3,2,0], val=5)
         doc2.apply_op(op5)
-        self.assertEqual(doc2.get_node([3,2,0]), 5)
+        self.assertEqual(doc2.get_value([3,2,0]), 5)
 
     def test_boolean_negation(self):
         doc0 =  Document()
@@ -166,20 +166,20 @@ class TestSimpleNodeOperations(unittest.TestCase):
         self.assertEqual(doc0.snapshot, False)
 
         # boolean at some key/index
-        op2 = Op('bn', [], key=4)
+        op2 = Op('bn', [4])
         doc2.apply_op(op2)
-        self.assertEqual(doc2.get_value([],key=4), False)
+        self.assertEqual(doc2.get_value([4]), False)
         doc2.apply_op(op2)
-        self.assertEqual(doc2.get_value([],key=4), True)
+        self.assertEqual(doc2.get_value([4]), True)
 
         # boolean along some path
-        path3 = ['fifth',2]
-        doc1.apply_op(Op('set', path3, key='sixth', val=True))
-        op3 = Op('bn', path3, key='sixth')
+        path3 = ['fifth',2,'sixth']
+        doc1.apply_op(Op('set', path3, val=True))
+        op3 = Op('bn', path3)
         doc1.apply_op(op3)
-        self.assertEqual(doc1.get_value(path3, key='sixth'), False)
+        self.assertEqual(doc1.get_value(path3), False)
         doc1.apply_op(op3)
-        self.assertEqual(doc1.get_value(path3, key='sixth'), True)
+        self.assertEqual(doc1.get_value(path3), True)
 
     def test_number_add(self):
         doc0 =  Document()
@@ -193,15 +193,15 @@ class TestSimpleNodeOperations(unittest.TestCase):
         self.assertEqual(doc0.snapshot, 5)
 
         # number deeper in doc
-        op2 = Op('na', ['fifth'], key=1, val=-100)
+        op2 = Op('na', ['fifth',1], val=-100)
         doc1.apply_op(op2)
-        self.assertEqual(doc1.get_value(['fifth'], key=1), -34)
+        self.assertEqual(doc1.get_value(['fifth',1]), -34)
 
         # funkier numbers accepted by JSON
         # int frac
-        op3 = Op('na', ['fifth'], key=1, val=34.5)
+        op3 = Op('na', ['fifth',1], val=34.5)
         doc1.apply_op(op3)
-        self.assertEqual(doc1.get_value(['fifth'], key=1), 0.5)
+        self.assertEqual(doc1.get_value(['fifth',1]), 0.5)
 
     def test_string_insert(self):
         doc1 = self.doc1
@@ -223,9 +223,9 @@ class TestSimpleNodeOperations(unittest.TestCase):
         self.assertEqual(doc3.snapshot, 'startABC word DEFGend')
 
         # something in nested dict
-        op4 = Op('si', [3,1], key=0, offset=5, val='sional')
+        op4 = Op('si', [3,1,0], offset=5, val='sional')
         doc2.apply_op(op4)
-        self.assertEqual(doc2.get_value([3,1], key=0), 'dimensional')
+        self.assertEqual(doc2.get_value([3,1,0]), 'dimensional')
 
     def test_string_delete(self):
         doc1 = self.doc1
@@ -247,9 +247,9 @@ class TestSimpleNodeOperations(unittest.TestCase):
         self.assertEqual(doc3.snapshot, 'CF')
 
         # something deep in doc
-        op4 = Op('sd', [3,1], key=0, val=2, offset=3)
+        op4 = Op('sd', [3,1,0], val=2, offset=3)
         doc2.apply_op(op4)
-        self.assertEqual(doc2.get_value([3,1], key=0), 'dim')
+        self.assertEqual(doc2.get_value([3,1,0]), 'dim')
 
     def test_array_insert(self):
         doc0 =  Document()
@@ -275,14 +275,15 @@ class TestSimpleNodeOperations(unittest.TestCase):
         self.assertEqual(doc0.snapshot, ['a','b','c','d'])
 
         # insert into some array deep in doc
-        op5 = Op('ai', [3], key=1, val='a', offset=1)
+        op5 = Op('ai', [3,1], val='a', offset=1)
         doc2.apply_op(op5)
-        self.assertEqual(doc2.get_value([3], key=1), ['dimen', 'a'])
+        self.assertEqual(doc2.get_value([3,1]), ['dimen', 'a'])
 
         # again
-        op6 = Op('ai', [], key='fifth', val='a', offset=1)
+        op6 = Op('ai', ['fifth'], val='a', offset=1)
         doc1.apply_op(op6)
-        self.assertEqual(doc1.get_value(['fifth'], key=1), 'a')
+        result6 = [55,'a',66,{'sixth': 'deep string'}, 'rw']
+        self.assertEqual(doc1.get_value(['fifth']), result6)
 
     def test_array_delete(self):
         doc0 =  Document()
@@ -298,12 +299,12 @@ class TestSimpleNodeOperations(unittest.TestCase):
         # remove one from list
         op2 = Op('ad', [], offset=1, val=1)
         doc2.apply_op(op2)
-        self.assertEqual(doc2.get_value([], key=1), 'normal, ol string')
+        self.assertEqual(doc2.get_value([1]), 'normal, ol string')
 
         # from nested lists
-        op3 = Op('ad', [], key=2, offset=1, val=1)
+        op3 = Op('ad', [2], offset=1, val=1)
         doc2.apply_op(op3)
-        self.assertEqual(doc2.get_value([], key=2), [['multi'],['array']])
+        self.assertEqual(doc2.get_value([2]), [['multi'],['array']])
 
         # delete multiple elements
         op4 = Op('ad', [], offset=0, val=4)
@@ -316,9 +317,9 @@ class TestSimpleNodeOperations(unittest.TestCase):
         self.assertEqual(doc2.snapshot, [None])
 
         # in dicts
-        op6 = Op('ad', [], key='fifth', offset=2, val=2)
+        op6 = Op('ad', ['fifth'], offset=2, val=2)
         doc1.apply_op(op6)
-        self.assertEqual(doc1.get_value([], key='fifth'), [55,66])
+        self.assertEqual(doc1.get_value(['fifth']), [55,66])
 
     def test_array_move(self):
         doc1 = self.doc1
@@ -332,10 +333,10 @@ class TestSimpleNodeOperations(unittest.TestCase):
         self.assertEqual(doc2.snapshot, result1)
 
         # Move to end of list
-        op2 = Op('am', [], key='fifth', offset=0, val=3)
+        op2 = Op('am', ['fifth'], offset=0, val=3)
         doc1.apply_op(op2)
         result2 = [66,{'sixth': 'deep string'}, 'rw', 55]
-        self.assertEqual(doc1.get_value([], key='fifth'), result2)
+        self.assertEqual(doc1.get_value(['fifth']), result2)
 
     def test_object_insert(self):
         doc0 = self.doc0
@@ -343,7 +344,6 @@ class TestSimpleNodeOperations(unittest.TestCase):
         doc2 = self.doc2
 
         # whole doc is a dict. insert a key val pair
-        kv1 = {'key':'a', 'val':1}
         kv1 = {'key':'a', 'val':1}
         op1 = Op('oi', [], val=kv1)
         doc0.apply_op(op1)
@@ -354,10 +354,10 @@ class TestSimpleNodeOperations(unittest.TestCase):
         self.assertEqual(doc0.snapshot, {'a':1, 'b':2})
 
         # nested dicts
-        op3 = Op('oi', ['fifth'], key=2, val=kv1)
+        op3 = Op('oi', ['fifth',2], val=kv1)
         doc1.apply_op(op3)
         result3 = {'sixth': 'deep string', 'a': 1}
-        self.assertEqual(doc1.get_value(['fifth'], key=2), result3)
+        self.assertEqual(doc1.get_value(['fifth',2]), result3)
 
     def test_object_delete(self):
         doc1 = self.doc1
@@ -371,7 +371,7 @@ class TestSimpleNodeOperations(unittest.TestCase):
         self.assertEqual(doc1.snapshot, result1)
 
         # nested
-        op2 = Op('od', ['fifth'], key=2, offset='sixth')
+        op2 = Op('od', ['fifth',2], offset='sixth')
         doc1.apply_op(op2)
         result2 = {'first': 'some string',
                    'fifth': [55,66,{}, 'rw']}
