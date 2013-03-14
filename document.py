@@ -1,15 +1,17 @@
 import json
 import random
 import string
+import uuid
 from changeset import Changeset
 from op import Op
 
 class Document:
     snapshot = {}
-    deps = []
-    dep_hashes = []
+    changesets = [] # all changesets from all users. sorted
+    pending_changesets = []
     open_changeset = None
-    author = 'Ritchie'
+    author = str(uuid.uuid4())
+    changeset_stamp = 0
 
     # Each document needs an ID so that changesets can be associated
     # with it. If one is not supplied, make a random 5 character ID at
@@ -30,9 +32,9 @@ class Document:
         """
         if self.open_changeset == None:
             dep_list = []
-            for dep in self.deps:
-                dep_list.append(dep['id'])
-            self.open_changeset = Changeset(self.id_, self.author, dep_list)
+            for dep in self.changesets:
+                dep_list.append(dep.get_id())
+            self.open_changeset = Changeset(self.id_, self.author, self.changesets)
         self.open_changeset.add_op(op)
         self.apply_op(op)
 
@@ -45,40 +47,62 @@ class Document:
 
         Adds the changeset to this documents list of dependencies.
         """
-        self.deps.append({'id':self.open_changeset.get_id(),\
-                          'changeset': self.open_changeset.to_dict()})
-        self.dep_hashes.append({'id':self.open_changeset.get_id(), \
-                                'deps': self.open_changeset.deps})
+
+        self.changesets.append(self.open_changeset)
         self.open_changeset = None
 
-    # When a user is sent a new changeset from another editor, put it
-    # into place and rebuild state with that addition. Because the
-    # list of dependencies should already be sorted, this is a simple
-    # insertion sort applied only to the new item.
+
     def recieve_changeset(self, cs):
-        # TODO first check that this doc has all needed dependencies
+        """
+        When a user is sent a new changeset from another editor, put
+        it into place and rebuild state with that addition. Because
+        the list of dependencies should already be sorted, this is a
+        simple insertion sort applied only to the new item.
+        """
+        if not self.has_needed_deps(cs):
+            print("ERROR")
+            self.pending_changesets.append(cs)
+            return
 
         # insert sort this changeset back into place
-        i = len(self.deps)
+        i = len(self.changesets)
         while i > 0:
-            if len(cs.deps) > len(self.deps[i-1]['changeset']['deps']):
+            if len(cs.deps) > len(self.changesets[i-1].deps):
                 break
-            if len(cs.deps) == len(self.deps[i-1]['changeset']['deps']):
-                if cs.get_id() > self.deps[i-1]['id']:
+            if len(cs.deps) == len(self.changesets[i-1].deps):
+                if cs.get_id() > self.changesets[i-1].get_id():
                     break
             i -= 1
                 
-        self.deps.insert(i, {'id': cs.get_id(), 'changeset':cs.to_dict()})
-        self.dep_hashes.insert(i, {'id': cs.get_id(), 'deps':cs.deps})
+        self.changesets.insert(i, cs)
+        self.ot()
         self.rebuild_snapshot()
 
-    # Start from an empty {} document and rebuild it from op in each changeset
+
+    def ot(self):
+        prev = []
+        for cs in self.changesets:
+            cs.add_preceding_changesets(prev)
+            prev.append(cs)
+        
+    def has_needed_deps(self, cs):
+        """
+        A peer has sent the changeset cs, so this determines if this
+        client has all the need dependencies before it can be applied.
+        """
+
+        return True
+            
+
     def rebuild_snapshot(self):
+        """
+        Start from an empty {} document and rebuild it from each op in
+        each changeset.
+        """
         self.snapshot = {}
-        for dep in self.deps:
-            for op in dep['changeset']['ops']:
-                tmpOp = Op(op['action'], op['path'], val=op['val'])
-                self.apply_op(tmpOp)
+        for cs in self.changesets:
+            for op in cs.ops:
+                self.apply_op(op)
 
     # To determine if the path is valid in this document
     def contains_path(self, path):
@@ -138,15 +162,15 @@ class Document:
     # JSON Opperation - Insert characters into a string at the given
     # path, and at the given offset within that string.
     def string_insert(self, op):
-        cur = self.get_value(op.path)
-        return  cur[:op.offset] + op.val + cur[op.offset:]
+        cur = self.get_value(op.t_path)
+        return  cur[:op.t_offset] + op.t_val + cur[op.t_offset:]
 
     # JSON Opperation - Delete given number of characters from a
     # string at the given path, and at the given offset within that
     # string.
     def string_delete(self, op):
-        cur = self.get_value(op.path)
-        return cur[:op.offset] + cur[op.offset + op.val:]
+        cur = self.get_value(op.t_path)
+        return cur[:op.t_offset] + cur[op.t_offset + op.t_val:]
         
     
     def array_insert(self, op):
@@ -194,25 +218,3 @@ class Document:
         'od' : 'object_delete'
     }
 
-d = Document()
-d.add_op(Op('oi', [], val={'key':'a','val':1}))
-d.close_changeset()
-d.add_op(Op('set', ['a'], val={'c':3}))
-d.close_changeset()
-d.add_op(Op('oi', [], val={'key':'b','val':2}))
-d.close_changeset()
-
-
-init_hash = d.dep_hashes[0]['id']
-second_hash = d.dep_hashes[1]['id']
-d_id = d.id_
-cs1 = Changeset(d_id, 'NOT RITCHIE', [init_hash, second_hash])
-cs1.add_op(Op('oi', ['a'], val={'key':'d','val':4}))
-d.recieve_changeset(cs1)
-
-for dep in d.deps:
-    print(dep)
-print(d.snapshot)
-for dep in d.dep_hashes:
-    print(dep)
-print (d.snapshot)

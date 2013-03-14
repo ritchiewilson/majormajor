@@ -108,5 +108,15 @@ class TestChangeset(unittest.TestCase):
         self.c12.merge_past_changeset(self.c9)
         self.assertEqual(self.c12.path, ['fifth',4])
 
+        # When inserting into the same place, figure out which order
+        # they should go
+        c1 = Changeset('insert_into_array', 1, 0, 'fifth', 3, value=19)
+        c2 = Changeset('insert_into_array', 1, 0, 'fifth', 3, value=99)
+        c1.merge_past_changeset(c2)
+        self.assertEqual(c1.pos, 3)
+
+        c2.merge_past_changeset(c1)
+        self.assertEqual(c2.pos, 4)
+
 if __name__ == '__main__':
     unittest.main()

@@ -80,7 +80,7 @@ class TestSimpleNodeOperations(unittest.TestCase):
         doc0 = self.doc0
         doc1 = self.doc1
         doc2 = self.doc2
-        
+
         path1 = []
         self.assertEqual(doc0.get_node(path1), {})
         self.assertEqual(doc1.get_node(path1), doc1.snapshot)
