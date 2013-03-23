@@ -31,9 +31,6 @@ class Document:
         is then immediatly applied to this Document.
         """
         if self.open_changeset == None:
-            dep_list = []
-            for dep in self.changesets:
-                dep_list.append(dep.get_id())
             self.open_changeset = Changeset(self.id_, self.author, self.changesets)
         self.open_changeset.add_op(op)
         self.apply_op(op)
@@ -62,8 +59,9 @@ class Document:
         if not self.has_needed_deps(cs):
             print("ERROR")
             self.pending_changesets.append(cs)
-            return
+            return False
 
+        
         # insert sort this changeset back into place
         i = len(self.changesets)
         while i > 0:
@@ -73,10 +71,12 @@ class Document:
                 if cs.get_id() > self.changesets[i-1].get_id():
                     break
             i -= 1
-                
+
         self.changesets.insert(i, cs)
         self.ot()
         self.rebuild_snapshot()
+        print self.snapshot, 'document.ppy'
+        return True
 
 
     def ot(self):
@@ -101,6 +101,7 @@ class Document:
         """
         self.snapshot = {}
         for cs in self.changesets:
+            cs.author
             for op in cs.ops:
                 self.apply_op(op)
 
