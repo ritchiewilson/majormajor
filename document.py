@@ -22,6 +22,12 @@ class Document:
         self.id_ = id_
         
 
+    def get_id(self):
+        return self.id_
+
+    def get_user(self):
+        return self.author
+                 
     def add_op(self, op):
         """
         For when this user (not remote collaborators) add an
