@@ -106,7 +106,7 @@ class Document:
     def ot(self):
         prev = []
         for cs in self.changesets:
-            cs.add_preceding_changesets(prev)
+            cs.transform_from_preceding_changesets(prev)
             prev.append(cs)
         
     def has_needed_deps(self, cs):
