@@ -28,6 +28,13 @@ class Op:
             s.append({'offset': self.offset})
         return s
 
+    def to_dict(self):
+        s = {'action': self.action,
+             'path': self.path,
+             'val': self.val,
+             'offset': self.offset}
+        return s
+    
     def ot(self, pc):
         """
         pc: Changeset - previous changeset which has been applied but

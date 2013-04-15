@@ -10,24 +10,43 @@ class Document:
     changesets = [] # all changesets from all users. sorted
     pending_changesets = []
     open_changeset = None
-    author = str(uuid.uuid4())
     changeset_stamp = 0
 
     # Each document needs an ID so that changesets can be associated
     # with it. If one is not supplied, make a random 5 character ID at
     # start
-    def __init__(self, id_ = None):
+    def __init__(self, id_ = None, user=None):
         if id_ == None:
-            id_ = ''.join(random.choice(string.ascii_letters + string.digits) for x in range(5))
+            id_ = ''.join(random.choice(string.ascii_letters + string.digits)
+                          for x in range(5))
         self.id_ = id_
+        if user == None:
+            user = str(uuid.uuid4())
+        self.user = user
         
 
     def get_id(self):
         return self.id_
 
     def get_user(self):
-        return self.author
-                 
+        return self.user
+
+    def get_last_changeset(self):
+        return self.changesets[-1] if self.changesets else None
+
+    def get_changeset_by_id(self, cs_id):
+        deps = None
+        for cs in self.changesets:
+            if cs.get_id() == cs_id:
+                return cs
+        return None
+
+    def get_snapshot(self):
+        return self.snapshot
+
+    def set_snapshot(self, snapshot, deps=None):
+        self.snapshot = snapshot
+        
     def add_op(self, op):
         """
         For when this user (not remote collaborators) add an
@@ -37,7 +56,7 @@ class Document:
         is then immediatly applied to this Document.
         """
         if self.open_changeset == None:
-            self.open_changeset = Changeset(self.id_, self.author, self.changesets)
+            self.open_changeset = Changeset(self.id_, self.user, self.changesets)
         self.open_changeset.add_op(op)
         self.apply_op(op)
 
@@ -81,7 +100,6 @@ class Document:
         self.changesets.insert(i, cs)
         self.ot()
         self.rebuild_snapshot()
-        print self.snapshot, 'document.ppy'
         return True
 
 
@@ -107,7 +125,7 @@ class Document:
         """
         self.snapshot = {}
         for cs in self.changesets:
-            cs.author
+            cs.get_user()
             for op in cs.ops:
                 self.apply_op(op)
 

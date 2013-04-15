@@ -4,7 +4,7 @@ import json
 
 
 HOST = '<broadcast>'
-PORT = 8080
+PORT = 8000
 
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -12,11 +12,14 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 s.connect((HOST, PORT))
 
 
-msg = {'action':'changeset',
-       'user':'not ritchie',
-       'doc_id':'lorum ipsum',
-       'deps':'lorum ipsum',
-       'ops':[{'action':'si', 'path':[], 'val':'XYX', 'offset':2}]
+msg ={'action':'changeset',
+      'payload': [
+          {'user':'not ritchie'},
+          {'doc_id':'lorum ipsum'},
+          {'deps':'lorum ipsum'},
+          {'ops':[{'action':'si', 'path':[], 'val':'XYX', 'offset':2}]}
+          ],
+        'cs_id':'asldfka;sdlfa;sdlf'
 }
 
 cursor = {'action':'cursor',
@@ -29,7 +32,7 @@ cursor = {'action':'cursor',
           }
 
 announce = {'action':'announce',
-            'user': 'not ritchie',
+            'users': 'not ritchie',
             'doc_id': 'dummy'}
 
 #s.send(json.dumps(announce))

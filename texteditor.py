@@ -2,23 +2,6 @@ from gi.repository import Gtk, Pango
 from collaborator import Collaborator
 from op import Op
 
-class SearchDialog(Gtk.Dialog):
-
-    def __init__(self, parent):
-        Gtk.Dialog.__init__(self, "Search", parent,
-            Gtk.DialogFlags.MODAL, buttons=(
-            Gtk.STOCK_FIND, Gtk.ResponseType.OK,
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
-
-        box = self.get_content_area()
-
-        label = Gtk.Label("Insert text you want to search for:")
-        box.add(label)
-
-        self.entry = Gtk.Entry()
-        box.add(self.entry)
-
-        self.show_all()
 
 class TextViewWindow(Gtk.Window):
 
@@ -45,12 +28,16 @@ class TextViewWindow(Gtk.Window):
         
         self.collaborator = Collaborator()
         self.document = self.collaborator.new_document()
-        self.collaborator.connect('remote-cursor-update', self.remote_cursor_update)
-        self.collaborator.connect('recieve-changeset', self.recieve_changeset)
         op = Op('set', [], val='')
         self.document.add_op(op)
+        self.collaborator.connect('remote-cursor-update', self.remote_cursor_update)
+        self.collaborator.connect('recieve-changeset', self.recieve_changeset)
+        self.collaborator.connect('recieve-snapshot', self.recieve_changeset)
+        self.collaborator.connect('accept-invitation', self.accept_invitation)
 
-
+    def accept_invitation(self, doc):
+        self.document = doc
+        
     def remote_cursor_update(self):
         buf = self.textbuffer
         for i in self.collaborator.connections:
@@ -63,24 +50,22 @@ class TextViewWindow(Gtk.Window):
             m.set_visible(True)
 
     def insert_text_handler(s, textbuffer, iter_, text, length):
-        text = unicode(text)
         op = Op('si', [], offset=iter_.get_offset(), val=text)
-        s.document.add_op(op)
-        s.document.close_changeset()
+        s.collaborator.add_local_op(s.document, op)
         print "inserting"
         
     def delete_range_handler(s, textbuffer, start, end):
         val = end.get_offset() - start.get_offset()
         op = Op('sd', [], offset=start.get_offset(), val=val)
-        s.document.add_op(op)
-        s.document.close_changeset()
+        s.collaborator.add_local_op(s.document, op)
         print 'deleting'
         
     def recieve_changeset(self):
+        print self.document.get_snapshot()
         h_ids = self.collaborator_handlers
         with self.textbuffer.handler_block(h_ids['insert-text']):
             with self.textbuffer.handler_block(h_ids['delete-range']):
-                self.textbuffer.set_text(self.document.snapshot)
+                self.textbuffer.set_text(self.document.get_snapshot())
         print self.document.snapshot, ' recieve'
 
     def create_toolbar(self):
@@ -135,9 +120,6 @@ class TextViewWindow(Gtk.Window):
 
         toolbar.insert(Gtk.SeparatorToolItem(), 10)
 
-        button_search = Gtk.ToolButton.new_from_stock(Gtk.STOCK_FIND)
-        button_search.connect("clicked", self.on_search_clicked)
-        toolbar.insert(button_search, 11)
 
     def create_textview(self):
         scrolledwindow = Gtk.ScrolledWindow()
@@ -213,27 +195,6 @@ class TextViewWindow(Gtk.Window):
     def on_justify_toggled(self, widget, justification):
         self.textview.set_justification(justification)
 
-    def on_search_clicked(self, widget):
-        dialog = SearchDialog(self)
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-            cursor_mark = self.textbuffer.get_insert()
-            start = self.textbuffer.get_iter_at_mark(cursor_mark)
-            if start.get_offset() == self.textbuffer.get_char_count():
-                start = self.textbuffer.get_start_iter()
-
-            self.search_and_mark(dialog.entry.get_text(), start)
-
-        dialog.destroy()
-
-    def search_and_mark(self, text, start):
-        end = self.textbuffer.get_end_iter()
-        match = start.forward_search(text, 0, end)
-
-        if match != None:
-            match_start, match_end = match
-            self.textbuffer.apply_tag(self.tag_found, match_start, match_end)
-            self.search_and_mark(text, match_end)
 
 win = TextViewWindow()
 win.connect("delete-event", Gtk.main_quit)
