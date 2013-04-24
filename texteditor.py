@@ -61,12 +61,11 @@ class TextViewWindow(Gtk.Window):
         print 'deleting'
         
     def recieve_changeset(self):
-        print self.document.get_snapshot()
         h_ids = self.collaborator_handlers
         with self.textbuffer.handler_block(h_ids['insert-text']):
             with self.textbuffer.handler_block(h_ids['delete-range']):
                 self.textbuffer.set_text(self.document.get_snapshot())
-        print self.document.snapshot, ' recieve'
+        print self.document.get_snapshot(), ' recieve'
 
     def create_toolbar(self):
         toolbar = Gtk.Toolbar()

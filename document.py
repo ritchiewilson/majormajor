@@ -86,7 +86,6 @@ class Document:
             self.pending_changesets.append(cs)
             return False
 
-        
         # insert sort this changeset back into place
         i = len(self.changesets)
         while i > 0:
@@ -98,14 +97,19 @@ class Document:
             i -= 1
 
         self.changesets.insert(i, cs)
-        self.ot()
+        self.ot(i)
         self.rebuild_snapshot()
         return True
 
 
-    def ot(self):
-        prev = []
-        for cs in self.changesets:
+    def ot(self, start=0):
+        """
+        Perform opperational transformation on all changesets from
+        start onwards.
+        """
+        prev = self.changesets[:start]
+        to_transfrom = self.changesets[start:]
+        for cs in to_transfrom:
             cs.transform_from_preceding_changesets(prev)
             prev.append(cs)
         

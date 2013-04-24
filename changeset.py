@@ -29,6 +29,20 @@ class Changeset:
         """
         return self.deps
 
+    def get_last_dependency(self):
+        """
+        Return the Changeset object which is this changeset's most
+        recent dependency.
+        """
+        return self.deps[-1] if self.deps else None
+
+    def get_unaccounted_changesets(self):
+        """
+        List of all the changes that happened before this changeset
+        but were not known or accounted for. Kept in ascending order.
+        """
+        return self.preceding_changesets
+    
     def set_id(self, id_):
         """
         Set the id of this document. Called when building a remote
@@ -59,14 +73,19 @@ class Changeset:
         self.preceding_changesets = []
 
         # figure out all the actions which have come before and are
-        # not a dependency of this changeset.
-        for pc in pcs:
-            found = False
-            for dep in self.deps:
-                if pc.get_id() == dep.get_id():
-                    found = True
-            if not found:
-                self.preceding_changesets.append(pc)
+        # not a dependency of this changeset. Move backwards through
+        # the list of previous changes. If this changeset doesn't know
+        # about, add it to the list. If it does know, just append it's
+        # list of previously unknown changes and stop.
+        ucs = [] #unknown changesets tmp
+        i = len(pcs) - 1
+        while i > 0:
+            if pcs[i].get_id() == self.get_last_dependency().get_id():
+                ucs = pcs[i].get_unaccounted_changesets() + ucs
+                break
+            else:
+                ucs = [pcs[i]] + ucs
+        self.preceding_changesets = ucs
 
         # those 'preceding_changesets' need to be used to transform
         # this changeset's operations.
