@@ -41,11 +41,48 @@ class Document:
                 return cs
         return None
 
+    def get_changesets_in_range(self, start_id, end_id):
+        cs_in_range = []
+        start_reached = False if start_id else True
+        for cs in self.changesets:
+            if cs.get_id() == end_id:
+                return cs_in_range
+            if start_reached:
+                cs_in_range.append(cs)
+            if cs.get_id() == start_id:
+                start_reached = True
+        return cs_in_range # TODO needed?
+
     def get_snapshot(self):
         return self.snapshot
 
     def set_snapshot(self, snapshot, deps=None):
+        """
+        Reset the snapshot of this documnet. Also needs to take the
+        dependency that defines this snapshot. Since the local user
+        will be working on from this point, this dependency takes over
+        and all previously known changesets are put in the pending
+        list until they can be sorted back in.
+        """
+        self.pending_changesets += self.changesets
         self.snapshot = snapshot
+        self.changesets = [deps] if deps else []
+
+    def knows_changeset(self, cd_id):
+        for cs in self.changesets:
+            print cs
+            if cd_id == cs.get_id(): return True
+        return False
+
+    def insert_historical_changeset(self, cs):
+        dep = cs.get_last_dependency()
+        if dep == None or dep in self.changesets:
+            i =self.insert_changeset_into_changsets(cs)
+            return i # return index of where it was stuck
+        else:
+            self.pending_changesets.append(cs)
+            return -1
+            
         
     def add_op(self, op):
         """
@@ -86,6 +123,15 @@ class Document:
             self.pending_changesets.append(cs)
             return False
 
+        i = self.insert_changeset_into_changsets(cs)
+        self.ot(i)
+        self.rebuild_snapshot()
+        return True
+
+    def insert_changeset_into_changsets(self, cs):
+        """
+        Return the index for where the changeset was put
+        """
         # insert sort this changeset back into place
         i = len(self.changesets)
         while i > 0:
@@ -97,10 +143,7 @@ class Document:
             i -= 1
 
         self.changesets.insert(i, cs)
-        self.ot(i)
-        self.rebuild_snapshot()
-        return True
-
+        return i
 
     def ot(self, start=0):
         """

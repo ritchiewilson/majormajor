@@ -97,9 +97,7 @@ class Collaborator:
                 return
         action = m['action']
         if action == 'announce':
-            self.add_connection(m, addr, port)
-            self.invite_to_document(m['user'], self.documents[0].get_user(),
-                                    self.documents[0].get_id())
+            self.recieve_announce(m, addr, port)
         if action == 'changeset':
             self.recieve_changeset(m)
         if action == 'cursor':
@@ -110,9 +108,19 @@ class Collaborator:
             self.send_snapshot(m)
         if action == 'send_snapshot':
             self.recieve_snapshot(m)
+        if action == 'request_history':
+            self.send_history(m)
+        if action == 'send_history':
+            self.recieve_history(m)
 
         return True
 
+    def recieve_announce(self, m, addr, port):
+        self.add_connection(m, addr, port)
+        self.invite_to_document(m['user'], self.documents[0].get_user(),
+                                self.documents[0].get_id())
+
+        
     def send_snapshot(self, m):
         """
         Send the current snapshot of a document to a collaborator
@@ -134,10 +142,65 @@ class Collaborator:
         Set a document snapshot from the one send from a collaborator.
         """
         doc = self.get_document(m['doc_id'])
-        doc.set_snapshot(m['snapshot'], m['deps'])
+        deps = m['deps']
+        last_known_cs = doc.get_last_changeset()
+        new_cs = self.build_changeset_from_dict(deps) if deps else None
+        doc.set_snapshot(m['snapshot'], new_cs)
+        if deps:
+            self.request_history(doc, new_cs, last_known_cs)
         for callback in self.signal_callbacks['recieve-snapshot']:
             callback()
 
+    def request_history(self, doc, new_cs, last_known_cs):
+        """
+        Request full info for changsets that have been referenced by are
+        unknown to this collaborator. Also must send out the last
+        changeset locally known so collborators know how much history
+        to send. The local user wants all changesets from the
+        last_known_cs up to the new_cs.
+        """
+        
+        msg = {'action': 'request_history',
+               'doc_id': doc.get_id(),
+               'user': doc.get_user(),
+               'new_cs_id':new_cs.get_id() if new_cs else None,
+               'last_known_cs_id':
+               last_known_cs.get_id() if last_known_cs else None
+               }
+        self.broadcast(msg)
+
+    def send_history(self, m):
+        """
+        send the history to from last_known_cs to new_cs
+        """
+        doc = self.get_document(m['doc_id'])
+        if not doc:
+            return
+        css = doc.get_changesets_in_range(m['last_known_cs_id'],
+                                          m['new_cs_id'])
+        msg = {'action': 'send_history',
+               'doc_id': doc.get_id(),
+               'user': doc.get_user(),
+               'history': [cs.to_dict() for cs in css]
+               }
+        self.broadcast(msg)
+
+    def recieve_history(self, m):
+        """
+        Get a list of past changesets and insert them into the
+        document. Opperational transformation does not need to be done
+        on these now. It is assumed that current snapshot already
+        incorporates these changes.
+        """
+        doc = self.get_document(m['doc_id'])
+        if not doc:
+            return
+        for cs in m['history']:
+            print cs
+            # build historical changeset
+            hcs = self.build_changeset_from_dict(cs)
+            doc.insert_historical_changeset(hcs)
+        
     def accept_invitation_to_document(self, m):
         """
         Accept an inviation to work on a document by requesting it's
@@ -205,12 +268,13 @@ class Collaborator:
     def build_changeset_from_dict(self, m):
         """
         From a dict, build a changeset object with all its ops.
+        TODO should not be in Collaborator class
         """
         doc = self.get_document(m['doc_id'])
         if not doc:
             return
 
-        p = m['payload']
+        p = m # used to send whole message. fix this later TODO
         last_dep = doc.get_changeset_by_id(p['dep'])
         deps = [] if last_dep == None else last_dep.get_deps() + [last_dep]
         cs = Changeset(p['doc_id'], p['user'],deps)
@@ -249,7 +313,7 @@ class Collaborator:
         if not doc:
             return
 
-        cs = self.build_changeset_from_dict(m)
+        cs = self.build_changeset_from_dict(m['payload'])
         if not doc.recieve_changeset(cs):
             return
 
