@@ -49,13 +49,13 @@ class TextViewWindow(Gtk.Window):
 
     def insert_text_handler(s, textbuffer, iter_, text, length):
         op = Op('si', [], offset=iter_.get_offset(), val=text)
-        s.collaborator.add_local_op(s.document, op)
+        s.document.add_local_op(op)
         print "inserting"
         
     def delete_range_handler(s, textbuffer, start, end):
         val = end.get_offset() - start.get_offset()
         op = Op('sd', [], offset=start.get_offset(), val=val)
-        s.collaborator.add_local_op(s.document, op)
+        s.document.add_local_op(op)
         print 'deleting'
         
     def recieve_changeset(self):
@@ -64,7 +64,6 @@ class TextViewWindow(Gtk.Window):
             with self.textbuffer.handler_block(h_ids['delete-range']):
                 self.textbuffer.set_text(self.document.get_snapshot())
         print self.document.get_snapshot(), ' recieve'
-        print len(self.document.changesets)
 
     def create_toolbar(self):
         toolbar = Gtk.Toolbar()
@@ -171,6 +170,8 @@ class TextViewWindow(Gtk.Window):
         radio_wrapword.connect("toggled", self.on_wrap_toggled, Gtk.WrapMode.WORD)
 
     def on_button_clicked(self, widget, tag):
+        self.collaborator.big_insert = not self.collaborator.big_insert
+
         bounds = self.textbuffer.get_selection_bounds()
         if len(bounds) != 0:
             start, end = bounds
@@ -188,6 +189,7 @@ class TextViewWindow(Gtk.Window):
         self.textview.set_cursor_visible(widget.get_active())
 
     def on_wrap_toggled(self, widget, mode):
+        self.collaborator.big_insert = not self.collaborator.big_insert
         self.textview.set_wrap_mode(mode)
 
     def on_justify_toggled(self, widget, justification):

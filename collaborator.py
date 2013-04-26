@@ -24,6 +24,7 @@ class Collaborator:
     connections = []
     # TODO: user authentication
     default_user = str(uuid.uuid4())
+    big_insert = False
 
     def __init__(self):
         """
@@ -37,8 +38,28 @@ class Collaborator:
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.s.bind((HOST, PORT))
         GObject.io_add_watch(self.s, GObject.IO_IN, self._listen_callback)
+        #GObject.timeout_add(7, self.test_thousands_ops)
+        GObject.timeout_add(10, self.close_open_changesets)
         self.announce()
-        
+
+    def test_thousands_ops(self):
+        if self.big_insert:
+            self.documents[0].add_local_op(Op('si',[],offset=0,val='s'))
+            self.documents[0].close_changeset()
+            for callback in self.signal_callbacks['recieve-snapshot']:
+                callback()
+        return True
+
+    def close_open_changesets(self):
+        for doc in self.documents:
+            oc = doc.get_open_changeset()
+            if oc and not oc.is_empty():
+                cs = doc.close_changeset()
+                self.send_changeset(cs)
+        return True
+                
+            
+            
 
     def new_document(self, doc_id=None, user=default_user, snapshot=None):
         """
@@ -67,7 +88,7 @@ class Collaborator:
 
         TODO: is this worthless? Should be part of document.
         """
-        doc.add_op(op)
+        doc.add_local_op(op)
         doc.close_changeset()
         cs = doc.get_last_changeset()
         self.send_changeset(cs)

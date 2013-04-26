@@ -46,6 +46,9 @@ class Document:
                 return cs
         return None
 
+    def get_open_changeset(self):
+        return self.open_changeset
+
     def get_changesets_in_range(self, start_id, end_id):
         #print "GET CHANGESETS IN RANGE ", start_id, end_id
         #print [ cs.to_dict() for cs in self.changesets]
@@ -70,7 +73,7 @@ class Document:
         TODO - throw exception if doc is not new
         """
         op = Op('set', [], val=s)
-        self.add_op(op)
+        self.add_local_op(op)
         self.close_changeset()
         
 
@@ -102,7 +105,7 @@ class Document:
             return -1
             
         
-    def add_op(self, op):
+    def add_local_op(self, op):
         """
         For when this user (not remote collaborators) add an
         opperation. If there is no open changeset, one will be opened
@@ -128,6 +131,8 @@ class Document:
 
         self.changesets.append(self.open_changeset)
         self.open_changeset = None
+        self.changesets[-1].get_id()
+        return self.changesets[-1]
 
 
     def recieve_changeset(self, cs):

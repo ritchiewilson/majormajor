@@ -10,6 +10,9 @@ class Changeset:
         self.preceding_changesets = []
         self.dependency = dependency
 
+    def is_empty(self):
+        return len(self.ops) == 0
+
     def has_full_dependency_info(self):
         return isinstance(self.dependency, Changeset)
 
