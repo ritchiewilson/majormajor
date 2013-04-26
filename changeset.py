@@ -5,11 +5,22 @@ class Changeset:
     id_ = None
     ops = []
     preceding_changesets = []
-    def __init__(self, doc_id, user, deps):
+    def __init__(self, doc_id, user, deps, dependency=None):
         self.doc_id = doc_id
         self.user = user
         self.deps = deps[:]
         self.ops = []
+        self.dependency = self.get_last_dependency() if deps else None
+        if not dependency  == None:
+            self.dependency = dependency
+
+    def has_full_dependency_info(self):
+        return isinstance(self.dependency, Changeset)
+
+    def get_dependency_id(self):
+        if self.has_full_dependency_info():
+            return self.dependency.get_id()
+        return self.dependency
 
     def get_doc_id(self):
         """
@@ -107,7 +118,7 @@ class Changeset:
         if len(self.deps) > 0:
             dep = self.deps[-1].get_id()
         j = [{'doc_id': self.doc_id}, {'user':self.user},\
-             {'dep':dep}, {'ops': op_list}]
+             {'dep':self.get_dependency_id()}, {'ops': op_list}]
         return j
 
    
@@ -118,7 +129,7 @@ class Changeset:
         """
         d = {'doc_id': self.doc_id,
              'user': self.user,
-             'dep': self.deps[-1].get_id() if len(self.deps) > 0 else None,
+             'dep_id': self.get_dependency_id(),
              'ops': [op.to_dict() for op in self.ops]}
         return d
         

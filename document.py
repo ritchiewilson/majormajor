@@ -6,8 +6,6 @@ from changeset import Changeset
 from op import Op
 
 class Document:
-    snapshot = {}
-    changesets = [] # all changesets from all users. sorted
     pending_changesets = []
     open_changeset = None
     changeset_stamp = 0
@@ -15,7 +13,7 @@ class Document:
     # Each document needs an ID so that changesets can be associated
     # with it. If one is not supplied, make a random 5 character ID at
     # start
-    def __init__(self, id_ = None, user=None):
+    def __init__(self, id_ = None, user=None, snapshot=None):
         if id_ == None:
             id_ = ''.join(random.choice(string.ascii_letters + string.digits)
                           for x in range(5))
@@ -23,6 +21,11 @@ class Document:
         if user == None:
             user = str(uuid.uuid4())
         self.user = user
+        self.changesets = []
+        self.snapshot = {}
+        if not snapshot == None:
+            self.set_initial_snapshot(snapshot)
+        
         
 
     def get_id(self):
@@ -42,6 +45,8 @@ class Document:
         return None
 
     def get_changesets_in_range(self, start_id, end_id):
+        #print "GET CHANGESETS IN RANGE ", start_id, end_id
+        #print [ cs.to_dict() for cs in self.changesets]
         cs_in_range = []
         start_reached = False if start_id else True
         for cs in self.changesets:
@@ -55,6 +60,17 @@ class Document:
 
     def get_snapshot(self):
         return self.snapshot
+
+    def set_initial_snapshot(self, s):
+        """
+        Can stick in boilerplate snapshot for doc. turns snapshot into an
+        opperation.
+        TODO - throw exception if doc is not new
+        """
+        op = Op('set', [], val=s)
+        self.add_op(op)
+        self.close_changeset()
+        
 
     def set_snapshot(self, snapshot, deps=None):
         """
@@ -130,17 +146,24 @@ class Document:
 
     def insert_changeset_into_changsets(self, cs):
         """
-        Return the index for where the changeset was put
+        Also Return the index for where the changeset was put
         """
         # insert sort this changeset back into place
+        dep_id = cs.get_dependency_id()
         i = len(self.changesets)
+        # move backwards through list until it finds it's dependency
         while i > 0:
-            if len(cs.deps) > len(self.changesets[i-1].deps):
+            if dep_id == self.changesets[i-1].get_id():
                 break
-            if len(cs.deps) == len(self.changesets[i-1].deps):
-                if cs.get_id() > self.changesets[i-1].get_id():
-                    break
             i -= 1
+
+        # Move forward through list if multiple changesets have the
+        # same dependency
+        while i < len(self.changesets) and \
+              dep_id == self.changesets[i].get_id() and \
+              cs.get_id() > self.changesets[i].get_id():
+            i += 1
+        
 
         self.changesets.insert(i, cs)
         return i

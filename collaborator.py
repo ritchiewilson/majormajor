@@ -40,14 +40,14 @@ class Collaborator:
         self.announce()
         
 
-    def new_document(self, doc_id=None, user=default_user):
+    def new_document(self, doc_id=None, user=default_user, snapshot=None):
         """
         Create a new Document to add to the list of open
         documents. When no doc_id is provided, a random one will be
         assigned. When no user is defined, the default is used.
         TODO: should split this up into new_document and open_document
         """
-        d = Document(doc_id, user)
+        d = Document(doc_id, user, snapshot)
         self.documents.append(d)
         return d
 
@@ -134,7 +134,6 @@ class Collaborator:
                'user': doc.get_user(),
                'snapshot': doc.get_snapshot(),
                'deps': deps}
-        print msg
         self.broadcast(msg)
 
     def recieve_snapshot(self, m):
@@ -164,8 +163,8 @@ class Collaborator:
                'doc_id': doc.get_id(),
                'user': doc.get_user(),
                'new_cs_id':new_cs.get_id() if new_cs else None,
-               'last_known_cs_id':
-               last_known_cs.get_id() if last_known_cs else None
+               'last_known_cs_id': None,
+               #last_known_cs.get_id() if last_known_cs else None
                }
         self.broadcast(msg)
 
@@ -196,7 +195,6 @@ class Collaborator:
         if not doc:
             return
         for cs in m['history']:
-            print cs
             # build historical changeset
             hcs = self.build_changeset_from_dict(cs)
             doc.insert_historical_changeset(hcs)
@@ -275,9 +273,9 @@ class Collaborator:
             return
 
         p = m # used to send whole message. fix this later TODO
-        last_dep = doc.get_changeset_by_id(p['dep'])
+        last_dep = doc.get_changeset_by_id(p['dep_id'])
         deps = [] if last_dep == None else last_dep.get_deps() + [last_dep]
-        cs = Changeset(p['doc_id'], p['user'],deps)
+        cs = Changeset(p['doc_id'], p['user'],deps, dependency=p['dep_id'])
         for j in p['ops']:
             op = Op(j['action'],j['path'],j['val'],j['offset'])
             cs.add_op(op)

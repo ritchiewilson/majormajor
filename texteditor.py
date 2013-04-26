@@ -27,9 +27,7 @@ class TextViewWindow(Gtk.Window):
 
         
         self.collaborator = Collaborator()
-        self.document = self.collaborator.new_document()
-        op = Op('set', [], val='')
-        self.document.add_op(op)
+        self.document = self.collaborator.new_document(snapshot='')
         self.collaborator.connect('remote-cursor-update', self.remote_cursor_update)
         self.collaborator.connect('recieve-changeset', self.recieve_changeset)
         self.collaborator.connect('recieve-snapshot', self.recieve_changeset)
