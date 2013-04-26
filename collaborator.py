@@ -163,8 +163,7 @@ class Collaborator:
                'doc_id': doc.get_id(),
                'user': doc.get_user(),
                'new_cs_id':new_cs.get_id() if new_cs else None,
-               'last_known_cs_id': None,
-               #last_known_cs.get_id() if last_known_cs else None
+               'last_known_cs_id': last_known_cs.get_id() if last_known_cs else None
                }
         self.broadcast(msg)
 
@@ -273,9 +272,9 @@ class Collaborator:
             return
 
         p = m # used to send whole message. fix this later TODO
-        last_dep = doc.get_changeset_by_id(p['dep_id'])
-        deps = [] if last_dep == None else last_dep.get_deps() + [last_dep]
-        cs = Changeset(p['doc_id'], p['user'],deps, dependency=p['dep_id'])
+        dependency = doc.get_changeset_by_id(p['dep_id'])
+        dependency = p['dep_id'] if dependency == None else dependency
+        cs = Changeset(p['doc_id'], p['user'], dependency)
         for j in p['ops']:
             op = Op(j['action'],j['path'],j['val'],j['offset'])
             cs.add_op(op)

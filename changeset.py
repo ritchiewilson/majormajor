@@ -2,17 +2,13 @@ import hashlib
 import json
 
 class Changeset:
-    id_ = None
-    ops = []
-    preceding_changesets = []
-    def __init__(self, doc_id, user, deps, dependency=None):
+    def __init__(self, doc_id, user, dependency):
         self.doc_id = doc_id
         self.user = user
-        self.deps = deps[:]
+        self.id_ = None
         self.ops = []
-        self.dependency = self.get_last_dependency() if deps else None
-        if not dependency  == None:
-            self.dependency = dependency
+        self.preceding_changesets = []
+        self.dependency = dependency
 
     def has_full_dependency_info(self):
         return isinstance(self.dependency, Changeset)
@@ -40,12 +36,12 @@ class Changeset:
         """
         return self.deps
 
-    def get_last_dependency(self):
+    def get_dependency(self):
         """
         Return the Changeset object which is this changeset's most
         recent dependency.
         """
-        return self.deps[-1] if self.deps else None
+        return self.dependency
 
     def get_unaccounted_changesets(self):
         """
@@ -91,7 +87,7 @@ class Changeset:
         ucs = [] #unknown changesets tmp
         i = len(pcs) - 1
         while i > 0:
-            if pcs[i].get_id() == self.get_last_dependency().get_id():
+            if pcs[i].get_id() == self.get_dependency_id():
                 ucs = pcs[i].get_unaccounted_changesets() + ucs
                 break
             else:
@@ -114,9 +110,6 @@ class Changeset:
         op_list = []
         for op in self.ops:
             op_list.append(op.to_jsonable())
-        dep = None
-        if len(self.deps) > 0:
-            dep = self.deps[-1].get_id()
         j = [{'doc_id': self.doc_id}, {'user':self.user},\
              {'dep':self.get_dependency_id()}, {'ops': op_list}]
         return j

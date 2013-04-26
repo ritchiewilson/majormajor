@@ -6,9 +6,6 @@ from changeset import Changeset
 from op import Op
 
 class Document:
-    pending_changesets = []
-    open_changeset = None
-    changeset_stamp = 0
 
     # Each document needs an ID so that changesets can be associated
     # with it. If one is not supplied, make a random 5 character ID at
@@ -21,11 +18,14 @@ class Document:
         if user == None:
             user = str(uuid.uuid4())
         self.user = user
+        # some initial values
         self.changesets = []
+        self.pending_changesets = []
+        self.open_changeset = None
         self.snapshot = {}
+        # set initial snapshot if called upon
         if not snapshot == None:
             self.set_initial_snapshot(snapshot)
-        
         
 
     def get_id(self):
@@ -38,8 +38,10 @@ class Document:
         return self.changesets[-1] if self.changesets else None
 
     def get_changeset_by_id(self, cs_id):
-        deps = None
         for cs in self.changesets:
+            if cs.get_id() == cs_id:
+                return cs
+        for cs in self.pending_changesets:
             if cs.get_id() == cs_id:
                 return cs
         return None
@@ -91,7 +93,7 @@ class Document:
         return False
 
     def insert_historical_changeset(self, cs):
-        dep = cs.get_last_dependency()
+        dep = cs.get_dependency()
         if dep == None or dep in self.changesets:
             i =self.insert_changeset_into_changsets(cs)
             return i # return index of where it was stuck
@@ -109,7 +111,8 @@ class Document:
         is then immediatly applied to this Document.
         """
         if self.open_changeset == None:
-            self.open_changeset = Changeset(self.id_, self.user, self.changesets)
+            self.open_changeset = Changeset(self.id_, self.user,
+                                            self.get_last_changeset())
         self.open_changeset.add_op(op)
         self.apply_op(op)
 
