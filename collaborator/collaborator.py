@@ -39,7 +39,7 @@ class Collaborator:
         self.s.bind((HOST, PORT))
         GObject.io_add_watch(self.s, GObject.IO_IN, self._listen_callback)
         #GObject.timeout_add(7, self.test_thousands_ops)
-        GObject.timeout_add(10, self.close_open_changesets)
+        GObject.timeout_add(1, self.close_open_changesets)
         self.announce()
 
     def test_thousands_ops(self):
