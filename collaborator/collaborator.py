@@ -10,7 +10,6 @@ import datetime
 from gi.repository import GObject, Gtk, GdkPixbuf
 
 
-
 HOST = '<broadcast>'
 PORT = 8000
 DEFAULT_COLLABORATOR_PORT = 8080
@@ -20,10 +19,7 @@ if len(sys.argv) > 1:
 
 
 class Collaborator:
-    documents = []
-    connections = []
     # TODO: user authentication
-    default_user = str(uuid.uuid4())
     big_insert = False
 
     def __init__(self):
@@ -32,7 +28,10 @@ class Collaborator:
         default port.
         TODO: change this to a "connection" abstracion
         """
-        
+        self.documents = []
+        self.connections = []
+        self.default_user = str(uuid.uuid4())
+
         self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -57,22 +56,21 @@ class Collaborator:
                 cs = doc.close_changeset()
                 self.send_changeset(cs)
         return True
-                
-            
-            
 
-    def new_document(self, doc_id=None, user=default_user, snapshot=None):
+    def new_document(self, doc_id=None, user=None, snapshot=None):
         """
         Create a new Document to add to the list of open
         documents. When no doc_id is provided, a random one will be
         assigned. When no user is defined, the default is used.
         TODO: should split this up into new_document and open_document
         """
+        if user == None:
+            user = self.default_user
         d = Document(doc_id, user, snapshot)
         self.documents.append(d)
         return d
 
-    def get_document(self, doc_id):
+    def get_document_by_id(self, doc_id):
         """
         A Collaborator can hold multiple documents. Get the relevent
         document by doc_id.
@@ -102,6 +100,7 @@ class Collaborator:
                'cs_id': cs.get_id(),
                'user':cs.get_user(),
                'doc_id':cs.get_doc_id()}
+        print msg
         self.broadcast(msg)
         
     def _listen_callback(self, source, condition):
@@ -147,9 +146,10 @@ class Collaborator:
         Send the current snapshot of a document to a collaborator
         requesting it. Need to include the dependency id for it.
         """
-        doc = self.get_document(m['doc_id'])
-        deps = doc.get_last_changeset()
-        deps = deps.to_dict() if deps else None
+        doc = self.get_document_by_id(m['doc_id'])
+        deps = []
+        for dep in doc.get_dependencies():
+            deps.append(dep.to_dict())
         msg = {'action': 'send_snapshot',
                'doc_id': doc.get_id(),
                'user': doc.get_user(),
@@ -161,17 +161,19 @@ class Collaborator:
         """
         Set a document snapshot from the one send from a collaborator.
         """
-        doc = self.get_document(m['doc_id'])
+        doc = self.get_document_by_id(m['doc_id'])
+        last_known_deps = doc.get_dependencies()
         deps = m['deps']
-        last_known_cs = doc.get_last_changeset()
-        new_cs = self.build_changeset_from_dict(deps) if deps else None
-        doc.set_snapshot(m['snapshot'], new_cs)
+        new_css = []
+        for dep in deps:
+            new_css.append(self.build_changeset_from_dict(dep))
+        doc.set_snapshot(m['snapshot'], new_css)
         if deps:
-            self.request_history(doc, new_cs, last_known_cs)
+            self.request_history(doc, new_css, last_known_deps)
         for callback in self.signal_callbacks['recieve-snapshot']:
             callback()
 
-    def request_history(self, doc, new_cs, last_known_cs):
+    def request_history(self, doc, new_css, last_known_css):
         """
         Request full info for changsets that have been referenced by are
         unknown to this collaborator. Also must send out the last
@@ -183,8 +185,8 @@ class Collaborator:
         msg = {'action': 'request_history',
                'doc_id': doc.get_id(),
                'user': doc.get_user(),
-               'new_cs_id':new_cs.get_id() if new_cs else None,
-               'last_known_cs_id': last_known_cs.get_id() if last_known_cs else None
+               'new_cs_ids': [cs.get_id() for cs in new_css ],
+               'last_known_cs_ids': [cs.get_id() for cs in last_known_css]
                }
         self.broadcast(msg)
 
@@ -192,11 +194,11 @@ class Collaborator:
         """
         send the history to from last_known_cs to new_cs
         """
-        doc = self.get_document(m['doc_id'])
+        doc = self.get_document_by_id(m['doc_id'])
         if not doc:
             return
-        css = doc.get_changesets_in_range(m['last_known_cs_id'],
-                                          m['new_cs_id'])
+        css = doc.get_changesets_in_ranges(m['last_known_cs_ids'],
+                                          m['new_cs_ids'])
         msg = {'action': 'send_history',
                'doc_id': doc.get_id(),
                'user': doc.get_user(),
@@ -211,13 +213,18 @@ class Collaborator:
         on these now. It is assumed that current snapshot already
         incorporates these changes.
         """
-        doc = self.get_document(m['doc_id'])
+        doc = self.get_document_by_id(m['doc_id'])
+        
         if not doc:
             return
+
+        known_changesets = doc.get_changesets()
+
         for cs in m['history']:
             # build historical changeset
             hcs = self.build_changeset_from_dict(cs)
             doc.insert_historical_changeset(hcs)
+        doc.relink_changesets(doc.get_changesets())
         
     def accept_invitation_to_document(self, m):
         """
@@ -233,7 +240,7 @@ class Collaborator:
         """
         Request a document snapshot from a user.
         """
-        doc = self.get_document(doc_id)
+        doc = self.get_document_by_id(doc_id)
         msg = {'action':'request_snapshot',
                'user': doc.get_user(),
                'doc_id': doc_id}
@@ -288,14 +295,16 @@ class Collaborator:
         From a dict, build a changeset object with all its ops.
         TODO should not be in Collaborator class
         """
-        doc = self.get_document(m['doc_id'])
+        doc = self.get_document_by_id(m['doc_id'])
         if not doc:
             return
 
         p = m # used to send whole message. fix this later TODO
-        dependency = doc.get_changeset_by_id(p['dep_id'])
-        dependency = p['dep_id'] if dependency == None else dependency
-        cs = Changeset(p['doc_id'], p['user'], dependency)
+        dependencies = []
+        for dep in m['dep_ids']:
+            d = doc.get_changeset_by_id(dep)
+            dependencies.append(d if not d == None else dep)
+        cs = Changeset(p['doc_id'], p['user'], dependencies)
         for j in p['ops']:
             op = Op(j['action'],j['path'],j['val'],j['offset'])
             cs.add_op(op)
@@ -327,11 +336,12 @@ class Collaborator:
         Handler for recieving changest messages from remote
         collaborators.
         """
-        doc = self.get_document(m['doc_id'])
+        doc = self.get_document_by_id(m['doc_id'])
         if not doc:
             return
 
         cs = self.build_changeset_from_dict(m['payload'])
+        print "CS ID ", cs.get_id()
         if not doc.recieve_changeset(cs):
             return
 

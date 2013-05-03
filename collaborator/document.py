@@ -37,6 +37,28 @@ class Document:
     def get_last_changeset(self):
         return self.changesets[-1] if self.changesets else None
 
+    def get_dependencies(self):
+        """
+        Returns a list of the dependencies that make up the the current
+        document. Usually this is a list of with just the most recent
+        changeset. There can be multiple changesets if they each
+        depend on the same changeset but do not know about each other.
+        """
+        dep_heads = []
+        i = 0
+        while i < len(self.changesets):
+            j = i+1
+            found = False
+            while j < len(self.changesets):
+                if self.changesets[i] in self.changesets[j].get_dependencies():
+                    found = True
+                    break
+                j += 1
+            if not found:
+                dep_heads.append(self.changesets[i])
+            i += 1
+        return dep_heads
+
     def get_changeset_by_id(self, cs_id):
         for cs in self.changesets:
             if cs.get_id() == cs_id:
@@ -49,22 +71,25 @@ class Document:
     def get_open_changeset(self):
         return self.open_changeset
 
-    def get_changesets_in_range(self, start_id, end_id):
-        #print "GET CHANGESETS IN RANGE ", start_id, end_id
-        #print [ cs.to_dict() for cs in self.changesets]
-        cs_in_range = []
-        start_reached = False if start_id else True
+    def get_changesets_in_ranges(self, start_ids, end_ids):
+        cs_in_range = []            
+        start_reached = False if start_ids else True
         for cs in self.changesets:
-            if cs.get_id() == end_id:
-                return cs_in_range
-            if start_reached:
+            if len(end_ids) == 0:
+                break
+            if cs.get_id() in end_ids:
+                end_ids.pop(end_ids.index(cs.get_id()))
+            elif start_reached:
                 cs_in_range.append(cs)
-            if cs.get_id() == start_id:
+            if cs.get_id() in start_ids:
                 start_reached = True
         return cs_in_range # TODO needed?
 
     def get_snapshot(self):
         return self.snapshot
+
+    def get_changesets(self):
+        return self.changesets
 
     def set_initial_snapshot(self, s):
         """
@@ -87,23 +112,34 @@ class Document:
         """
         self.pending_changesets += self.changesets
         self.snapshot = snapshot
-        self.changesets = [deps] if deps else []
+        self.changesets = deps
 
+    def relink_changesets(self, css):
+        """
+        UGLY. From a list of changesets, css, go through each one and
+        link up thier dependencies to changeset objects if need be.
+        """
+        for cs in css:
+            if not cs.has_full_dependency_info():
+                for dep in cs.get_dependencies():
+                    if not isinstance(dep, Changeset):
+                        dep = self.get_changeset_by_id(dep)
+                        if dep: cs.relink_changeset(dep)
+        
     def knows_changeset(self, cd_id):
         for cs in self.changesets:
-            print cs
             if cd_id == cs.get_id(): return True
         return False
 
     def insert_historical_changeset(self, cs):
-        dep = cs.get_dependency()
-        if dep == None or dep in self.changesets:
-            i =self.insert_changeset_into_changsets(cs)
-            return i # return index of where it was stuck
-        else:
-            self.pending_changesets.append(cs)
-            return -1
+        for dep in cs.get_dependencies():
+            if not dep in self.changesets:
+                self.pending_changesets.append(cs)
+                return -1
             
+        i =self.insert_changeset_into_changsets(cs)
+        return i # return index of where it was stuck
+
         
     def add_local_op(self, op):
         """
@@ -115,7 +151,7 @@ class Document:
         """
         if self.open_changeset == None:
             self.open_changeset = Changeset(self.id_, self.user,
-                                            self.get_last_changeset())
+                                            self.get_dependencies())
         self.open_changeset.add_op(op)
         self.apply_op(op)
 
@@ -157,42 +193,44 @@ class Document:
         Also Return the index for where the changeset was put
         """
         # insert sort this changeset back into place
-        dep_id = cs.get_dependency_id()
+        dep_ids = cs.get_dependency_ids()
         i = len(self.changesets)
         # move backwards through list until it finds it's dependency
         while i > 0:
-            if dep_id == self.changesets[i-1].get_id():
+            if self.changesets[i-1].get_id() in dep_ids:
                 break
             i -= 1
 
         # Move forward through list if multiple changesets have the
         # same dependency
         while i < len(self.changesets) and \
-              dep_id == self.changesets[i].get_id() and \
+              dep_ids == self.changesets[i].get_dependency_ids() and \
               cs.get_id() > self.changesets[i].get_id():
             i += 1
         
-
         self.changesets.insert(i, cs)
         return i
 
-    def ot(self, start=0):
+    def ot(self, start):
         """
         Perform opperational transformation on all changesets from
         start onwards.
         """
         prev = self.changesets[:start]
-        to_transfrom = self.changesets[start:]
+        new_cs = self.changesets[start]
+        new_cs.transform_from_preceding_changesets(prev)
+
+        prev.append(new_cs)
+        to_transfrom = self.changesets[start+1:]
         for cs in to_transfrom:
             cs.transform_from_preceding_changesets(prev)
-            prev.append(cs)
+
         
     def has_needed_deps(self, cs):
         """
         A peer has sent the changeset cs, so this determines if this
         client has all the need dependencies before it can be applied.
         """
-
         return True
             
 

@@ -2,24 +2,36 @@ import hashlib
 import json
 
 class Changeset:
-    def __init__(self, doc_id, user, dependency):
+    def __init__(self, doc_id, user, dependencies):
         self.doc_id = doc_id
         self.user = user
         self.id_ = None
         self.ops = []
         self.preceding_changesets = []
-        self.dependency = dependency
+        self.dependencies = dependencies
+        self.dependency_chain = None
 
     def is_empty(self):
         return len(self.ops) == 0
 
     def has_full_dependency_info(self):
-        return isinstance(self.dependency, Changeset)
+        """
+        Determine if each dependency has all it's info, or if any of the
+        dependencies are just an ID.
+        """
+        for dep in self.dependencies:
+            if not isinstance(dep, Changeset):
+                return False
+        return True
 
-    def get_dependency_id(self):
-        if self.has_full_dependency_info():
-            return self.dependency.get_id()
-        return self.dependency
+    def get_dependency_ids(self):
+        dep_ids = []
+        for dep in self.dependencies:
+            if isinstance(dep, Changeset):
+                dep_ids.append(dep.get_id())
+            else:
+                dep_ids.append(dep)
+        return dep_ids
 
     def get_doc_id(self):
         """
@@ -33,19 +45,29 @@ class Changeset:
         """
         return self.user
 
-    def get_deps(self):
-        """
-        Return the full list of dependencies for this changeset.
-        """
-        return self.deps
-
-    def get_dependency(self):
+    def get_dependencies(self):
         """
         Return the Changeset object which is this changeset's most
         recent dependency.
         """
-        return self.dependency
+        return self.dependencies
 
+    def get_dependency_chain(self):
+        """
+        Makes no garuntees for order.
+        """
+        if self.dependency_chain != None:
+            return self.dependency_chain
+        dep_chain = self.get_dependencies()
+        i=0
+        while i < len(dep_chain):
+            for dep in dep_chain[i].get_dependencies():
+                if not dep in dep_chain:
+                    dep_chain.append(dep)
+            i += 1
+        self.dependency_chain = list(set(dep_chain))
+        return self.dependency_chain
+            
     def get_unaccounted_changesets(self):
         """
         List of all the changes that happened before this changeset
@@ -72,7 +94,15 @@ class Changeset:
         self.ops.append(op)
         return True
 
-    def transform_from_preceding_changesets(self, pcs):
+    def relink_changeset(self, dep):
+        i = 0
+        while i < len(self.dependencies):
+            if self.dependencies[i] == dep.get_id():
+                self.dependencies[i] = dep
+                break
+            i += 1
+
+    def transform_from_preceding_changesets(self, prev_css):
         """
         pcs is a list of all known changesets that come before this
         one. Figure out which ones in that list are not a dependency
@@ -81,22 +111,14 @@ class Changeset:
         transformation for it.
         """
         self.preceding_changesets = []
-
-        # figure out all the actions which have come before and are
-        # not a dependency of this changeset. Move backwards through
-        # the list of previous changes. If this changeset doesn't know
-        # about, add it to the list. If it does know, just append it's
-        # list of previously unknown changes and stop.
-        ucs = [] #unknown changesets tmp
-        i = len(pcs) - 1
-        while i > 0:
-            if pcs[i].get_id() == self.get_dependency_id():
-                ucs = pcs[i].get_unaccounted_changesets() + ucs
-                break
-            else:
-                ucs = [pcs[i]] + ucs
-        self.preceding_changesets = ucs
-
+        print "GETTING CHAIN"
+        chain = self.get_dependency_chain()
+        self.preceding_changesets = []
+        print "Setting previous changesets"
+        for prev_cs in prev_css:
+            if not prev_cs in chain:
+                self.preceding_changesets.append(prev_cs)
+        print "OPPERATIONAL TRANSFORMATION"
         # those 'preceding_changesets' need to be used to transform
         # this changeset's operations.
         for pc in self.preceding_changesets:
@@ -114,7 +136,7 @@ class Changeset:
         for op in self.ops:
             op_list.append(op.to_jsonable())
         j = [{'doc_id': self.doc_id}, {'user':self.user},\
-             {'dep':self.get_dependency_id()}, {'ops': op_list}]
+             {'dep':self.get_dependency_ids()}, {'ops': op_list}]
         return j
 
    
@@ -125,7 +147,7 @@ class Changeset:
         """
         d = {'doc_id': self.doc_id,
              'user': self.user,
-             'dep_id': self.get_dependency_id(),
+             'dep_ids': self.get_dependency_ids(),
              'ops': [op.to_dict() for op in self.ops]}
         return d
         
