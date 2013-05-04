@@ -44,7 +44,8 @@ class Collaborator:
     def test_thousands_ops(self):
         if self.big_insert:
             self.documents[0].add_local_op(Op('si',[],offset=0,val='s'))
-            self.documents[0].close_changeset()
+            cs = self.documents[0].close_changeset()
+            self.send_changeset(cs)
             for callback in self.signal_callbacks['recieve-snapshot']:
                 callback()
         return True
@@ -100,7 +101,6 @@ class Collaborator:
                'cs_id': cs.get_id(),
                'user':cs.get_user(),
                'doc_id':cs.get_doc_id()}
-        print msg
         self.broadcast(msg)
         
     def _listen_callback(self, source, condition):
@@ -341,7 +341,6 @@ class Collaborator:
             return
 
         cs = self.build_changeset_from_dict(m['payload'])
-        print "CS ID ", cs.get_id()
         if not doc.recieve_changeset(cs):
             return
 

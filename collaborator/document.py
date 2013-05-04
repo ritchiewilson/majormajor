@@ -218,12 +218,14 @@ class Document:
         """
         prev = self.changesets[:start]
         new_cs = self.changesets[start]
+        new_cs.find_unaccounted_changesets(prev)
         new_cs.transform_from_preceding_changesets(prev)
 
         prev.append(new_cs)
         to_transfrom = self.changesets[start+1:]
         for cs in to_transfrom:
             cs.transform_from_preceding_changesets(prev)
+            prev.append(cs)
 
         
     def has_needed_deps(self, cs):
