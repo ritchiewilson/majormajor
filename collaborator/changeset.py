@@ -31,6 +31,7 @@ class Changeset:
                 dep_ids.append(dep.get_id())
             else:
                 dep_ids.append(dep)
+        dep_ids.sort()
         return dep_ids
 
     def get_ops(self):
@@ -88,6 +89,13 @@ class Changeset:
             i += 1
         return False
 
+    def set_unaccounted_changesets(self, css):
+        """
+        Sometimes the changesets could be calculated elsewhere. Just
+        stick it in.
+        """
+        self.preceding_changesets = css
+    
     def get_unaccounted_changesets(self):
         """
         List of all the changes that happened before this changeset

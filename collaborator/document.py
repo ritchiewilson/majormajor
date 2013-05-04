@@ -168,6 +168,7 @@ class Document:
         self.changesets.append(self.open_changeset)
         self.open_changeset = None
         self.changesets[-1].get_id()
+        self.changesets[-1].set_unaccounted_changesets([])
         return self.changesets[-1]
 
 
