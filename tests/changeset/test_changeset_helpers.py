@@ -1,3 +1,5 @@
+import pytest
+
 from collaborator.document import Document
 from collaborator.op import Op
 from collaborator.changeset import Changeset
@@ -6,7 +8,7 @@ from collaborator.changeset import Changeset
 class TestChangesetHelpers:
 
     def setup_method(self, method):
-        pass
+        self.cs0 = Changeset('doc_id', 'user_id', [])
         
     def test_is_empty(self):
         cs = Changeset('doc_id', 'user_id', [])
@@ -49,35 +51,50 @@ class TestChangesetHelpers:
         cs3 = Changeset('doc_id', 'user_id', [cs2, 'otherrandomid'])
         assert cs3.get_dependency_ids() == [cs2.get_id(), 'otherrandomid']
 
-    def test_get_dependency_chain(self):
-        cs0 = Changeset('doc_id', 'user_id', [])
-        assert cs0.get_dependency_chain() == []
-
-        cs1 = Changeset('doc_id', 'user_id', [cs0])
-        assert cs1.get_dependency_chain() == [cs0]
-
-        # there is no garuntee for order, so just check that the sets
-        # are equal moving forward
-        cs2 = Changeset('doc_id', 'user_id', [cs1])
-        assert set(cs2.get_dependency_chain()) == set([cs1, cs0])
-
-        cs3 = Changeset('doc_id', 'user_id', [cs2])
-        assert set(cs3.get_dependency_chain()) == set([cs2, cs1, cs0])
-        assert len(cs3.get_dependency_chain()) == 3
-
-        cs4 = Changeset('doc_id', 'user_id', [cs1])
-        cs5 = Changeset('doc_id', 'user_id', [cs4, cs3])
-        assert set(cs5.get_dependency_chain()) == set([cs4, cs3, cs2, cs1, cs0])
-
-        cs6 = Changeset('doc_id', 'user_id', [cs3])
-        assert set(cs6.get_dependency_chain()) == set([cs3, cs2, cs1, cs0])
-        assert len(cs6.get_dependency_chain()) == 4
-
-        cs7 = Changeset('doc_id', 'user_id', [cs6, cs5])
-        assert set(cs7.get_dependency_chain()) == set([cs6, cs5, cs4, cs3, cs2, cs1, cs0])
-        assert len(cs7.get_dependency_chain()) == 7
-
     def test_set_id(self):
         cs0 = Changeset('doc_id', 'user_id', [])
-        cs0.set_id('randomid')
+        assert cs0.set_id('randomid')
         assert cs0.get_id() == 'randomid'
+
+    def test_add_op(self):
+        op = Op('set', [],val='')
+        assert self.cs0.add_op(op)
+        assert self.cs0.get_ops() == [op]
+
+        # cannot add same op twice
+        with pytest.raises(Exception):
+            self.cs0.add_op(op)
+            
+        # add a differant op and it goes through
+        op2 = Op('set', [],val='')
+        assert self.cs0.add_op(op2)
+        assert self.cs0.get_ops() == [op, op2]
+
+        # once id is set, cannot add more ops
+        self.cs0.get_id()
+        op3 = Op('set', [],val='')
+        with pytest.raises(Exception):
+            self.cs0.add_op(op3)
+
+    def test_relink_changeset(self):
+        dep = Changeset('doc_id', 'user_id', [])
+        dep.set_id('defined_id')
+
+        # a cs with no dependencies should never relink
+        assert not self.cs0.relink_changeset(dep)
+
+        # cs does not need given dep
+        cs1 = Changeset('doc_id', 'user_id', [self.cs0])
+        assert not cs1.relink_changeset(dep)
+        assert cs1.get_dependencies() == [self.cs0]
+
+        # cs already has given dep info
+        cs2 = Changeset('doc_id', 'user_id', [self.cs0, dep])
+        assert not cs2.relink_changeset(dep)
+        assert cs2.get_dependencies() == [self.cs0, dep]
+
+        # cs needed and relinked given dep
+        cs3 = Changeset('doc_id', 'user_id', [self.cs0, 'defined_id'])
+        assert cs3.relink_changeset(dep)
+        assert cs3.get_dependencies() == [self.cs0, dep]
+

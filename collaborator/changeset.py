@@ -7,7 +7,7 @@ class Changeset:
         self.user = user
         self.id_ = None
         self.ops = []
-        self.preceding_changesets = []
+        self.preceding_changesets = None
         self.dependencies = dependencies
 
         
@@ -33,6 +33,9 @@ class Changeset:
                 dep_ids.append(dep)
         return dep_ids
 
+    def get_ops(self):
+        return self.ops
+
     def get_doc_id(self):
         """
         Return the id of the document this applies to.
@@ -51,20 +54,14 @@ class Changeset:
         recent dependency.
         """
         return self.dependencies
-        
-    def get_unaccounted_changesets(self):
-        """
-        List of all the changes that happened before this changeset
-        but were not known or accounted for. Kept in ascending order.
-        """
-        return self.preceding_changesets
-    
+            
     def set_id(self, id_):
         """
         Set the id of this document. Called when building a remote
         changset and the id is already known.
         """
         self.id_ = id_
+        return True
     
     def add_op(self, op):
         """
@@ -74,17 +71,31 @@ class Changeset:
         """
         if self.id_:
             raise Exception("Can't add op. Changeset is already closed.")
-            return False
+        if op in self.ops:
+            raise Exception("Can't add same op object multiple times.")
         self.ops.append(op)
         return True
 
     def relink_changeset(self, dep):
+        """
+        Returns true if a cs was relinked. False otherwise
+        """
         i = 0
         while i < len(self.dependencies):
             if self.dependencies[i] == dep.get_id():
                 self.dependencies[i] = dep
-                break
+                return True
             i += 1
+        return False
+
+    def get_unaccounted_changesets(self):
+        """
+        List of all the changes that happened before this changeset
+        but were not known or accounted for. Kept in ascending order.
+        """
+        if self.preceding_changesets == None:
+            raise Exception("Preceding Changesets not yet known")
+        return self.preceding_changesets
 
     def find_unaccounted_changesets(self, prev_css):
         # when this has no dependencies, the unacounted changesets are
