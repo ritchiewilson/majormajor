@@ -137,10 +137,14 @@ class Document:
         return False
 
     def insert_historical_changeset(self, cs):
-        for dep in cs.get_dependencies():
-            if not dep in self.changesets:
-                self.pending_changesets.append(cs)
-                return -1
+        """
+        Inserts a changeset into the changeset list without performing
+        OT. This is done when some future snapshot is known, but its
+        history is being put together.
+        """
+        if not self.has_needed_dependencies(cs):
+            self.pending_changesets.append(cs)
+            return -1
             
         i =self.insert_changeset_into_changsets(cs)
         return i # return index of where it was stuck
