@@ -2,6 +2,7 @@ import json
 import random
 import string
 import uuid
+import copy
 from changeset import Changeset
 from op import Op
 
@@ -114,6 +115,10 @@ class Document:
         self.snapshot = snapshot
         self.changesets = deps
 
+    def retry_pending_changesets(self):
+        for cs in self.pending_changesets:
+            pass
+        
     def relink_changesets(self, css):
         """
         UGLY. From a list of changesets, css, go through each one and
@@ -167,9 +172,15 @@ class Document:
 
         self.changesets.append(self.open_changeset)
         self.open_changeset = None
-        self.changesets[-1].get_id()
-        self.changesets[-1].set_unaccounted_changesets([])
-        return self.changesets[-1]
+        cs = self.get_last_changeset()
+        cs.get_id()
+        cs.set_unaccounted_changesets([])
+        # randomly select if if this changeset should be a cache
+        if random.random() < 0.1:
+            cs.set_as_snapshot_cache(True)
+            cs.set_snapshot_cache(copy.deepcopy(self.snapshot))
+            cs.set_snapshot_cache_is_valid(True)
+        return cs
 
 
     def recieve_changeset(self, cs):
@@ -179,14 +190,19 @@ class Document:
         the list of dependencies should already be sorted, this is a
         simple insertion sort applied only to the new item.
         """
-        if not self.has_needed_deps(cs):
+        
+        if not self.has_needed_dependencies(cs):
             print("ERROR")
             self.pending_changesets.append(cs)
             return False
 
         i = self.insert_changeset_into_changsets(cs)
         self.ot(i)
-        self.rebuild_snapshot()
+        self.rebuild_snapshot(i)
+        # randomly select if if this changeset should be a cache
+        if random.random() < 0.1:
+            cs.set_as_snapshot_cache(True)
+            cs.set_snapshot_cache_is_valid(False)
         return True
 
     def insert_changeset_into_changsets(self, cs):
@@ -229,24 +245,41 @@ class Document:
             prev.append(cs)
 
         
-    def has_needed_deps(self, cs):
+    def has_needed_dependencies(self, cs):
         """
         A peer has sent the changeset cs, so this determines if this
         client has all the need dependencies before it can be applied.
         """
-        return True
+        deps = cs.get_dependencies()[:]
+        i = len(self.changesets)-1
+        while i >= 0:
+            if self.changesets[i] in deps:
+                deps.remove(self.changesets[i])
+            if len(deps) == 0:
+                return True
+            i -= 1
+        return False
             
 
-    def rebuild_snapshot(self):
+    def rebuild_snapshot(self, index=0):
         """
         Start from an empty {} document and rebuild it from each op in
         each changeset.
         """
-        self.snapshot = {}
-        for cs in self.changesets:
-            cs.get_user()
-            for op in cs.ops:
+        while index > 0 and not self.changesets[index].has_valid_snapshot_cache():
+            index -= 1
+        if index == 0:
+            self.snapshot ={}
+        else:
+            self.snapshot = self.changesets[index].get_snapshot_cache()
+            index +=1
+        while index < len(self.changesets):
+            for op in self.changesets[index].get_ops():
                 self.apply_op(op)
+            if self.changesets[index].is_snapshot_cache():
+                self.changesets[index].set_snapshot_cache(copy.deepcopy(self.snapshot))
+                self.changesets[index].set_snapshot_cache_is_valid(True)
+            index += 1
 
     # To determine if the path is valid in this document
     def contains_path(self, path):

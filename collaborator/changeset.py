@@ -1,5 +1,6 @@
 import hashlib
 import json
+import random
 
 class Changeset:
     def __init__(self, doc_id, user, dependencies):
@@ -9,10 +10,30 @@ class Changeset:
         self.ops = []
         self.preceding_changesets = None
         self.dependencies = dependencies
+        self._is_snapshot_cache = False
+        self.snapshot_cache = None
 
         
     def is_empty(self):
         return len(self.ops) == 0
+
+    def is_snapshot_cache(self):
+        return self._is_snapshot_cache
+
+    def set_as_snapshot_cache(self, boolean):
+        self._is_snapshot_cache = boolean
+
+    def set_snapshot_cache(self, snapshot):
+        self.snapshot_cache = snapshot
+
+    def get_snapshot_cache(self):
+        return self.snapshot_cache
+
+    def set_snapshot_cache_is_valid(self, boolean):
+        self.snapshot_cache_is_valid = boolean
+
+    def has_valid_snapshot_cache(self):
+        return self._is_snapshot_cache and self.snapshot_cache_is_valid
 
     def has_full_dependency_info(self):
         """

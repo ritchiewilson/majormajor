@@ -20,7 +20,6 @@ if len(sys.argv) > 1:
 
 class Collaborator:
     # TODO: user authentication
-    big_insert = False
 
     def __init__(self):
         """
@@ -37,19 +36,30 @@ class Collaborator:
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.s.bind((HOST, PORT))
         GObject.io_add_watch(self.s, GObject.IO_IN, self._listen_callback)
-        #GObject.timeout_add(7, self.test_thousands_ops)
-        GObject.timeout_add(1, self.close_open_changesets)
+        GObject.timeout_add(10, self.test_thousands_ops)
+        GObject.timeout_add(22, self.close_open_changesets)
+        GObject.timeout_add(50, self.retry_pending_changesets)
         self.announce()
+        self.big_insert = False
+
 
     def test_thousands_ops(self):
         if self.big_insert:
-            self.documents[0].add_local_op(Op('si',[],offset=0,val='s'))
+            import random, string
+            o = random.randint(0, len(self.documents[0].get_snapshot()))
+            l = random.choice(string.ascii_letters + string.digits)
+            self.documents[0].add_local_op(Op('si',[],offset=o,val=l))
             cs = self.documents[0].close_changeset()
             self.send_changeset(cs)
             for callback in self.signal_callbacks['recieve-snapshot']:
                 callback()
         return True
 
+    def retry_pending_changesets(self):
+        for doc in self.documents:
+            doc.retry_pending_changesets()
+        return True
+    
     def close_open_changesets(self):
         for doc in self.documents:
             oc = doc.get_open_changeset()
@@ -232,6 +242,8 @@ class Collaborator:
         snapshot.
         """
         doc = self.new_document(m['doc_id'])
+        # TODO hardcoding this for testing
+        self.documents = [doc]
         self.request_snapshot(m['doc_id'])
         for callback in self.signal_callbacks['accept-invitation']:
             callback(doc)
