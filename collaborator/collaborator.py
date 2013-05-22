@@ -37,8 +37,7 @@ class Collaborator:
         self.s.bind((HOST, PORT))
         GObject.io_add_watch(self.s, GObject.IO_IN, self._listen_callback)
         GObject.timeout_add(10, self.test_thousands_ops)
-        GObject.timeout_add(22, self.close_open_changesets)
-        GObject.timeout_add(50, self.retry_pending_changesets)
+        GObject.timeout_add(75, self.close_open_changesets)
         self.announce()
         self.big_insert = False
 
@@ -47,17 +46,12 @@ class Collaborator:
         if self.big_insert:
             import random, string
             o = random.randint(0, len(self.documents[0].get_snapshot()))
-            l = random.choice(string.ascii_letters + string.digits)
+            l = unicode(random.choice(string.ascii_letters + string.digits))
             self.documents[0].add_local_op(Op('si',[],offset=o,val=l))
             cs = self.documents[0].close_changeset()
             self.send_changeset(cs)
-            for callback in self.signal_callbacks['recieve-snapshot']:
+            for callback in self.signal_callbacks['receive-snapshot']:
                 callback()
-        return True
-
-    def retry_pending_changesets(self):
-        for doc in self.documents:
-            doc.retry_pending_changesets()
         return True
     
     def close_open_changesets(self):
@@ -125,11 +119,12 @@ class Collaborator:
         for doc in self.documents:
             if doc.get_user() == m['user']:
                 return
+
         action = m['action']
         if action == 'announce':
-            self.recieve_announce(m, addr, port)
+            self.receive_announce(m, addr, port)
         if action == 'changeset':
-            self.recieve_changeset(m)
+            self.receive_changeset(m)
         if action == 'cursor':
             self.update_cursor(m)
         if action == 'invite_to_document':
@@ -137,15 +132,17 @@ class Collaborator:
         if action == 'request_snapshot':
             self.send_snapshot(m)
         if action == 'send_snapshot':
-            self.recieve_snapshot(m)
+            self.receive_snapshot(m)
         if action == 'request_history':
             self.send_history(m)
         if action == 'send_history':
-            self.recieve_history(m)
+            self.receive_history(m)
+        if action == 'request_changesets':
+            self.send_changesets(m)
 
         return True
 
-    def recieve_announce(self, m, addr, port):
+    def receive_announce(self, m, addr, port):
         self.add_connection(m, addr, port)
         self.invite_to_document(m['user'], self.documents[0].get_user(),
                                 self.documents[0].get_id())
@@ -167,20 +164,19 @@ class Collaborator:
                'deps': deps}
         self.broadcast(msg)
 
-    def recieve_snapshot(self, m):
+    def receive_snapshot(self, m):
         """
         Set a document snapshot from the one send from a collaborator.
         """
         doc = self.get_document_by_id(m['doc_id'])
+        if not doc:
+            return
         last_known_deps = doc.get_dependencies()
-        deps = m['deps']
-        new_css = []
-        for dep in deps:
-            new_css.append(self.build_changeset_from_dict(dep))
-        doc.set_snapshot(m['snapshot'], new_css)
-        if deps:
+        doc.receive_snapshot(m)
+        new_css = doc.get_dependencies()
+        if new_css:
             self.request_history(doc, new_css, last_known_deps)
-        for callback in self.signal_callbacks['recieve-snapshot']:
+        for callback in self.signal_callbacks['receive-snapshot']:
             callback()
 
     def request_history(self, doc, new_css, last_known_css):
@@ -216,7 +212,7 @@ class Collaborator:
                }
         self.broadcast(msg)
 
-    def recieve_history(self, m):
+    def receive_history(self, m):
         """
         Get a list of past changesets and insert them into the
         document. Opperational transformation does not need to be done
@@ -227,14 +223,8 @@ class Collaborator:
         
         if not doc:
             return
+        doc.receive_history(m)
 
-        known_changesets = doc.get_changesets()
-
-        for cs in m['history']:
-            # build historical changeset
-            hcs = self.build_changeset_from_dict(cs)
-            doc.insert_historical_changeset(hcs)
-        doc.relink_changesets(doc.get_changesets())
         
     def accept_invitation_to_document(self, m):
         """
@@ -290,6 +280,21 @@ class Collaborator:
                "user":from_user,
                "doc_id":doc_id}
         self.broadcast(msg)
+
+    def request_changesets(self, doc_id, cs_ids):
+        msg = {"action":"request_changesets",
+               "user":self.default_user,
+               "doc_id":doc_id,
+               'cs_ids':cs_ids}
+        self.broadcast(msg)
+
+    def send_changesets(self, m):
+        doc = self.get_document_by_id(m['doc_id'])
+        if not doc:
+            return
+        for cs_id in m['cs_ids']:
+            cs = doc.get_changeset_by_id(cs_id)
+            self.send_changeset(cs)
         
     def broadcast(self, msg):
         """
@@ -301,27 +306,6 @@ class Collaborator:
         for port in ports:
             self.s.sendto(json.dumps(msg), (HOST, port))
 
-    
-    def build_changeset_from_dict(self, m):
-        """
-        From a dict, build a changeset object with all its ops.
-        TODO should not be in Collaborator class
-        """
-        doc = self.get_document_by_id(m['doc_id'])
-        if not doc:
-            return
-
-        p = m # used to send whole message. fix this later TODO
-        dependencies = []
-        for dep in m['dep_ids']:
-            d = doc.get_changeset_by_id(dep)
-            dependencies.append(d if not d == None else dep)
-        cs = Changeset(p['doc_id'], p['user'], dependencies)
-        for j in p['ops']:
-            op = Op(j['action'],j['path'],j['val'],j['offset'])
-            cs.add_op(op)
-        return cs
-            
     def add_connection(self, m, addr, port):
         """
         TODO: point this to connection objects
@@ -343,7 +327,7 @@ class Collaborator:
         """
         self.signal_callbacks[signal].append(callback)
 
-    def recieve_changeset(self, m):
+    def receive_changeset(self, m):
         """
         Handler for recieving changest messages from remote
         collaborators.
@@ -352,16 +336,15 @@ class Collaborator:
         if not doc:
             return
 
-        cs = self.build_changeset_from_dict(m['payload'])
-        if not doc.recieve_changeset(cs):
+        if not doc.receive_changeset(m):
             return
 
-        for callback in self.signal_callbacks['recieve-changeset']:
+        for callback in self.signal_callbacks['receive-changeset']:
             callback()
 
     signal_callbacks = {
-        'recieve-changeset' : [],
-        'recieve-snapshot' : [],
+        'receive-changeset' : [],
+        'receive-snapshot' : [],
         'remote-cursor-update' : [],
         'accept-invitation': [],
         }

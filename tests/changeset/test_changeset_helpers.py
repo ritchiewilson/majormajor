@@ -76,25 +76,25 @@ class TestChangesetHelpers:
         with pytest.raises(Exception):
             self.cs0.add_op(op3)
 
-    def test_relink_changeset(self):
+    def test_relink_dependency(self):
         dep = Changeset('doc_id', 'user_id', [])
         dep.set_id('defined_id')
 
         # a cs with no dependencies should never relink
-        assert not self.cs0.relink_changeset(dep)
+        assert not self.cs0.relink_dependency(dep)
 
         # cs does not need given dep
         cs1 = Changeset('doc_id', 'user_id', [self.cs0])
-        assert not cs1.relink_changeset(dep)
+        assert not cs1.relink_dependency(dep)
         assert cs1.get_dependencies() == [self.cs0]
 
         # cs already has given dep info
         cs2 = Changeset('doc_id', 'user_id', [self.cs0, dep])
-        assert not cs2.relink_changeset(dep)
+        assert not cs2.relink_dependency(dep)
         assert cs2.get_dependencies() == [self.cs0, dep]
 
         # cs needed and relinked given dep
         cs3 = Changeset('doc_id', 'user_id', [self.cs0, 'defined_id'])
-        assert cs3.relink_changeset(dep)
+        assert cs3.relink_dependency(dep)
         assert cs3.get_dependencies() == [self.cs0, dep]
 

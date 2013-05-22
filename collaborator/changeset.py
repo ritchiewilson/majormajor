@@ -10,13 +10,57 @@ class Changeset:
         self.ops = []
         self.preceding_changesets = None
         self.dependencies = dependencies
+        self.children = []
+        self.parents = dependencies[:]
         self._is_snapshot_cache = False
         self.snapshot_cache = None
-
+        self.set_dependencies(dependencies)
         
     def is_empty(self):
         return len(self.ops) == 0
 
+    def set_dependencies(self, deps):
+        """
+        Split dependencies into two lists. One which holds dependencies
+        when the full cs object is known. The other is where we put
+        dependencies for which only the id is known.
+        """
+        self.dependencies_with_full_info = []
+        self.dependencies_with_id_only = []
+        for dep in deps:
+            if isinstance(dep, Changeset):
+                self.dependencies_with_full_info.append(dep)
+            else:
+                self.dependencies_with_id_only.append(dep)
+
+    def get_dependencies_with_id_only(self):
+        return self.dependencies_with_id_only[:]
+
+    def get_dependencies_with_full_info(self):
+        return self.dependencies_with_full_info[:]
+
+    def get_parents(self):
+        return self.parents[:]
+
+    def get_children(self):
+        return self.children[:]
+
+    def add_child(self, cs):
+        if cs not in self.children:
+            self.children.append(cs)
+        id_list = [child.get_id() for child in self.children]
+        id_list.sort()
+        ret = []
+        for _id in id_list:
+            for child in self.children:
+                if child.get_id() == _id:
+                    ret.append(child)
+        self.children = ret
+
+
+    def has_children(self):
+        return not self.children == []
+    
     def is_snapshot_cache(self):
         return self._is_snapshot_cache
 
@@ -35,6 +79,16 @@ class Changeset:
     def has_valid_snapshot_cache(self):
         return self._is_snapshot_cache and self.snapshot_cache_is_valid
 
+    def has_ancestor(self, ancestor):
+        if len(self.parents) == 0:
+            return False
+        if self == ancestor:
+            return True
+        for parent in self.parents:
+            if parent.has_ancestor(ancestor):
+                return True
+        return False
+
     def has_full_dependency_info(self):
         """
         Determine if each dependency has all it's info, or if any of the
@@ -46,17 +100,14 @@ class Changeset:
         return True
 
     def get_dependency_ids(self):
-        dep_ids = []
-        for dep in self.dependencies:
-            if isinstance(dep, Changeset):
-                dep_ids.append(dep.get_id())
-            else:
-                dep_ids.append(dep)
+        dep_ids = self.dependencies_with_id_only[:]
+        for dep in self.dependencies_with_full_info:
+            dep_ids.append(dep.get_id())
         dep_ids.sort()
         return dep_ids
 
     def get_ops(self):
-        return self.ops
+        return self.ops[:]
 
     def get_doc_id(self):
         """
@@ -75,7 +126,7 @@ class Changeset:
         Return the Changeset object which is this changeset's most
         recent dependency.
         """
-        return self.dependencies
+        return self.dependencies[:]
             
     def set_id(self, id_):
         """
@@ -98,11 +149,18 @@ class Changeset:
         self.ops.append(op)
         return True
 
-    def relink_changeset(self, dep):
+    def relink_dependency(self, dep):
         """
         Returns true if a cs was relinked. False otherwise
         """
+        
         i = 0
+        while i < len(self.dependencies_with_id_only):
+            if self.dependencies_with_id_only[i] == dep.get_id():
+                self.dependencies_with_full_info.append(dep)
+                self.dependencies_with_id_only.remove(dep.get_id())
+                break
+        # TODO try to get rid of the rest of this
         while i < len(self.dependencies):
             if self.dependencies[i] == dep.get_id():
                 self.dependencies[i] = dep
@@ -110,6 +168,17 @@ class Changeset:
             i += 1
         return False
 
+    def get_dependency_chain(self):
+        chain = set([])
+        still_to_check_queue = self.get_dependencies_with_full_info()
+        while len(still_to_check_queue) > 0:
+            el = still_to_check_queue.pop(0)
+            if el in chain:
+                continue
+            chain.update([el])
+            still_to_check_queue += el.get_dependencies_with_full_info()
+        return chain
+        
     def set_unaccounted_changesets(self, css):
         """
         Sometimes the changesets could be calculated elsewhere. Just
@@ -124,7 +193,7 @@ class Changeset:
         """
         if self.preceding_changesets == None:
             raise Exception("Preceding Changesets not yet known")
-        return self.preceding_changesets
+        return self.preceding_changesets[:]
 
     def find_unaccounted_changesets(self, prev_css):
         # when this has no dependencies, the unacounted changesets are
@@ -148,19 +217,25 @@ class Changeset:
             # dependencies
             p = set([])
             for dep in self.dependencies:
+                #TODO HERE! WRONG! Can't just add up the unaccounted
+                #changesets from deps because a cs unnaccounted in
+                # one line could be accounted for in the another
                 p.update(dep.get_unaccounted_changesets())
+            chain = self.get_dependency_chain()
+            p -= chain
             p = list(p)
             # sort those changesets into correct order
             self.preceding_changesets = []
             for prev_cs in prev_css:
                 if len(p) == 1:
                     self.preceding_changesets.append(prev_cs)
-                    while not prev_css[i] == prev_css:
+                    while not prev_css[i] == prev_cs:
                         i -=1
                     break
                 if prev_cs in p:
                     self.preceding_changesets.append(prev_cs)
                     p.remove(prev_cs)
+
         # Here all cached unknown changesets are in place in
         # self.preceding_changesets and i is set to the index in
         # prev_css of the most recent dependency to this changeset.

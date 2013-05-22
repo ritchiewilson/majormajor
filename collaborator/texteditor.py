@@ -29,8 +29,8 @@ class TextViewWindow(Gtk.Window):
         self.collaborator = Collaborator()
         self.document = self.collaborator.new_document(snapshot='')
         self.collaborator.connect('remote-cursor-update', self.remote_cursor_update)
-        self.collaborator.connect('recieve-changeset', self.recieve_changeset)
-        self.collaborator.connect('recieve-snapshot', self.recieve_changeset)
+        self.collaborator.connect('receive-changeset', self.receive_changeset)
+        self.collaborator.connect('receive-snapshot', self.receive_changeset)
         self.collaborator.connect('accept-invitation', self.accept_invitation)
 
     def accept_invitation(self, doc):
@@ -58,13 +58,13 @@ class TextViewWindow(Gtk.Window):
         s.document.add_local_op(op)
         print 'deleting'
         
-    def recieve_changeset(self):
+    def receive_changeset(self):
         h_ids = self.collaborator_handlers
         with self.textbuffer.handler_block(h_ids['insert-text']):
             with self.textbuffer.handler_block(h_ids['delete-range']):
                 self.textbuffer.set_text(self.document.get_snapshot())
-        #print self.document.get_snapshot(), ' recieve'
-        print ' recieve'
+        #print self.document.get_snapshot(), ' receive'
+        #print ' receive'
 
     def create_toolbar(self):
         toolbar = Gtk.Toolbar()

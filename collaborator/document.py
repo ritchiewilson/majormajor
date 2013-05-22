@@ -5,6 +5,7 @@ import uuid
 import copy
 from changeset import Changeset
 from op import Op
+from utils import build_changeset_from_dict
 
 class Document:
 
@@ -21,12 +22,20 @@ class Document:
         self.user = user
         # some initial values
         self.changesets = []
-        self.pending_changesets = []
+        self.ordered_changesets = []
+        self.all_known_changesets = {}
+        self.missing_changesets = []
+        self.send_queue = []
+        self.pending_new_changesets = []
+        self.pending_historical_changesets = []
         self.open_changeset = None
         self.snapshot = {}
+        self.root_changeset = None
+        self.dependencies = []
         # set initial snapshot if called upon
         if not snapshot == None:
             self.set_initial_snapshot(snapshot)
+        self.dependencies = [self.root_changeset]
         
 
     def get_id(self):
@@ -36,7 +45,13 @@ class Document:
         return self.user
 
     def get_last_changeset(self):
-        return self.changesets[-1] if self.changesets else None
+        return self.ordered_changesets[-1] if self.ordered_changesets else None
+
+    def get_root_changeset(self):
+        return self.root_changeset
+
+    def get_ordered_changesets(self):
+        return self.ordered_changesets[:]
 
     def get_dependencies(self):
         """
@@ -45,28 +60,18 @@ class Document:
         changeset. There can be multiple changesets if they each
         depend on the same changeset but do not know about each other.
         """
-        dep_heads = []
-        i = 0
-        while i < len(self.changesets):
-            j = i+1
-            found = False
-            while j < len(self.changesets):
-                if self.changesets[i] in self.changesets[j].get_dependencies():
-                    found = True
-                    break
-                j += 1
-            if not found:
-                dep_heads.append(self.changesets[i])
-            i += 1
-        return dep_heads
-
+        return self.dependencies[:]
+        
+    def get_missing_dependency_ids(self, new_cs):
+        missing_dep_ids = []
+        for dep in new_cs.get_dependencies():
+            if not isinstance(dep, Changeset):
+                missing_dep_ids.append(dep)
+        return missing_dep_ids
+                
     def get_changeset_by_id(self, cs_id):
-        for cs in self.changesets:
-            if cs.get_id() == cs_id:
-                return cs
-        for cs in self.pending_changesets:
-            if cs.get_id() == cs_id:
-                return cs
+        if cs_id in self.all_known_changesets:
+            return self.all_known_changesets[cs_id]
         return None
 
     def get_open_changeset(self):
@@ -92,6 +97,9 @@ class Document:
     def get_changesets(self):
         return self.changesets
 
+    def add_to_pending_new_changesets(self, cs):
+        self.pending_new_changesets.append(cs)
+
     def set_initial_snapshot(self, s):
         """
         Can stick in boilerplate snapshot for doc. turns snapshot into an
@@ -100,7 +108,10 @@ class Document:
         """
         op = Op('set', [], val=s)
         self.add_local_op(op)
-        self.close_changeset()
+        cs = self.close_changeset()
+        self.root_changeset = cs
+        self.changesets = self.tree_to_list()
+
         
 
     def set_snapshot(self, snapshot, deps=None):
@@ -111,29 +122,15 @@ class Document:
         and all previously known changesets are put in the pending
         list until they can be sorted back in.
         """
-        self.pending_changesets += self.changesets
+        self.pending_new_changesets += self.changesets
         self.snapshot = snapshot
         self.changesets = deps
 
-    def retry_pending_changesets(self):
-        for cs in self.pending_changesets:
-            pass
-        
-    def relink_changesets(self, css):
-        """
-        UGLY. From a list of changesets, css, go through each one and
-        link up thier dependencies to changeset objects if need be.
-        """
-        for cs in css:
-            if not cs.has_full_dependency_info():
-                for dep in cs.get_dependencies():
-                    if not isinstance(dep, Changeset):
-                        dep = self.get_changeset_by_id(dep)
-                        if dep: cs.relink_changeset(dep)
-        
-    def knows_changeset(self, cd_id):
-        for cs in self.changesets:
-            if cd_id == cs.get_id(): return True
+
+
+    def knows_changeset(self, cs_id):
+        if cs_id in self.all_known_changesets:
+            return True
         return False
 
     def insert_historical_changeset(self, cs):
@@ -143,10 +140,11 @@ class Document:
         history is being put together.
         """
         if not self.has_needed_dependencies(cs):
-            self.pending_changesets.append(cs)
+            self.pending_new_changesets.append(cs)
             return -1
-            
+        self.add_to_known_changesets(cs)
         i =self.insert_changeset_into_changsets(cs)
+        cs.find_unaccounted_changesets(self.changesets[:i])
         return i # return index of where it was stuck
 
         
@@ -174,11 +172,18 @@ class Document:
         Adds the changeset to this documents list of dependencies.
         """
 
-        self.changesets.append(self.open_changeset)
+        if self.open_changeset == None or self.open_changeset.is_empty():
+            return
+
+        cs = self.open_changeset
+        self.changesets.append(cs)
+        self.add_to_known_changesets(cs)
+        self.ordered_changesets.append(cs)
         self.open_changeset = None
-        cs = self.get_last_changeset()
-        cs.get_id()
         cs.set_unaccounted_changesets([])
+        # clean out old dependencies, since this should be the only
+        # one now
+        self.dependencies = [cs]
         # randomly select if if this changeset should be a cache
         if random.random() < 0.1:
             cs.set_as_snapshot_cache(True)
@@ -187,50 +192,70 @@ class Document:
         return cs
 
 
-    def recieve_changeset(self, cs):
+    def receive_changeset(self, cs):
         """
         When a user is sent a new changeset from another editor, put
-        it into place and rebuild state with that addition. Because
-        the list of dependencies should already be sorted, this is a
-        simple insertion sort applied only to the new item.
+        it into place and rebuild state with that addition.
         """
-        
+        if not isinstance(cs, Changeset):
+            cs = build_changeset_from_dict(cs['payload'], self)
         if not self.has_needed_dependencies(cs):
-            print("ERROR")
-            self.pending_changesets.append(cs)
+            self.pending_new_changesets.append(cs)
+            dep_ids = self.get_missing_dependency_ids(cs)
+            self.missing_changesets += dep_ids
             return False
 
-        i = self.insert_changeset_into_changsets(cs)
-        self.ot(i)
-        self.rebuild_snapshot(i)
+        # close the currently open changeset and get it ready for sending
+        current_cs = self.close_changeset()
+        if current_cs:
+            self.send_queue.append(current_cs)
+            
+        self.add_to_known_changesets(cs)
+        self.ordered_changesets = self.tree_to_list()
+
+        for parent in cs.get_parents():
+            if parent in self.dependencies:
+                self.dependencies.remove(parent)
+        self.dependencies.append(cs)
+        
+        #self.ot()
+        self.rebuild_snapshot()
+        
         # randomly select if if this changeset should be a cache
         if random.random() < 0.1:
             cs.set_as_snapshot_cache(True)
             cs.set_snapshot_cache_is_valid(False)
+        
         return True
 
-    def insert_changeset_into_changsets(self, cs):
+    def receive_snapshot(self, m):
         """
-        Also Return the index for where the changeset was put
+        m is the dict coming straight from another user over
+        the tubes.
         """
-        # insert sort this changeset back into place
-        dep_ids = cs.get_dependency_ids()
-        i = len(self.changesets)
-        # move backwards through list until it finds it's dependency
-        while i > 0:
-            if self.changesets[i-1].get_id() in dep_ids:
-                break
-            i -= 1
+        deps = m['deps']
+        new_css = []
+        for dep in deps:
+            new_css.append(build_changeset_from_dict(dep, self))
+        self.set_snapshot(m['snapshot'], new_css)
 
-        # Move forward through list if multiple changesets have the
-        # same dependency
-        while i < len(self.changesets) and \
-              dep_ids == self.changesets[i].get_dependency_ids() and \
-              cs.get_id() > self.changesets[i].get_id():
-            i += 1
+
+    def receive_history(self, m):
+        for cs in m['history']:
+            # build historical changeset
+            hcs = build_changeset_from_dict(cs,self)
+            self.insert_historical_changeset(hcs)
+        self.relink_changesets(self.get_changesets())
+        prev = []
+        for cs in self.changesets:
+            cs.find_unaccounted_changesets(prev)
+            prev.append(cs)
+
+    def add_to_known_changesets(self, cs):
+        self.all_known_changesets[cs.get_id()] = cs
+        for p in cs.get_parents():
+            p.add_child(cs)
         
-        self.changesets.insert(i, cs)
-        return i
 
     def ot(self, start):
         """
@@ -245,6 +270,7 @@ class Document:
         prev.append(new_cs)
         to_transfrom = self.changesets[start+1:]
         for cs in to_transfrom:
+            cs.find_unaccounted_changesets(prev)
             cs.transform_from_preceding_changesets(prev)
             prev.append(cs)
 
@@ -254,16 +280,11 @@ class Document:
         A peer has sent the changeset cs, so this determines if this
         client has all the need dependencies before it can be applied.
         """
-        deps = cs.get_dependencies()[:]
-        i = len(self.changesets)-1
-        while i >= 0:
-            if self.changesets[i] in deps:
-                deps.remove(self.changesets[i])
-            if len(deps) == 0:
-                return True
-            i -= 1
-        return False
-            
+        deps = cs.get_parents()[:]
+        for dep in deps:
+            if not dep in self.ordered_changesets:
+                return False
+        return True
 
     def rebuild_snapshot(self, index=0):
         """
@@ -284,6 +305,52 @@ class Document:
                 self.changesets[index].set_snapshot_cache(copy.deepcopy(self.snapshot))
                 self.changesets[index].set_snapshot_cache_is_valid(True)
             index += 1
+
+    def tree_to_list(self):
+        cs = self.root_changeset
+        tree_list = []
+        divergence_queue = []
+        multiple_parents_cache = []
+        insertion_point = 0
+        while True:
+            if len(cs.get_parents()) > 0:
+                multiple_parents_cache.append(cs)
+            tree_list.insert(insertion_point, cs)
+            insertion_point += 1
+            children = cs.get_children()
+            cs = children[0] if children else None
+
+            if (cs == None or cs in tree_list) and len(divergence_queue) == 0:
+                break
+
+            if cs in tree_list or cs == None:
+                # get the next changeset from the divergency Q to start from
+                cs = divergence_queue.pop(0)
+                # make sure we've got a new cs that isn't in the list already
+                while cs in tree_list and divergence_queue:
+                    cs = divergence_queue.pop(0)
+                if cs in tree_list and len(divergence_queue) == 0:
+                    break
+                    
+                children = cs.get_children()
+                i = 0
+                while i < len(multiple_parents_cache):
+                    if multiple_parents_cache[i].has_ancestor(cs):
+                        insertion_point = tree_list.index(multiple_parents_cache[i])
+                        break
+                    i += 1
+                # if we've cycled through all the recombining points,
+                # this is the end of a branch, so insertion_point
+                # should just be the end of the list.
+                if i == len(multiple_parents_cache):
+                    insertion_point = len(tree_list)
+            if children:
+                divergence_queue += children[1:]
+            
+
+            
+        return tree_list
+            
 
     # To determine if the path is valid in this document
     def contains_path(self, path):
