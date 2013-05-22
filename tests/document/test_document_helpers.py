@@ -5,30 +5,30 @@ from collaborator.op import Op
 class TestDocumentHelpers:
 
     def setup_method(self, method):
-        self.doc0 = Document()
-        self.doc1 = Document()
-        self.doc1.snapshot = {'first': 'some string',
-                            'second': {'third':'more string',
-                                       'fourth':{'numb':55}},
-                            'fifth': [55,66,{'sixth': 'deep string'}, 'rw']}
-        self.doc2 = Document()
-        self.doc2.snapshot = [{'name':'value'},
-                              [1,2,3,4],
-                              'normal, ol string',
-                              [['multi'],['dimen'],['array']],
-                              True,
-                              None,
-                              42]
-        self.doc3 = Document()
-        self.doc3.snapshot = 'ABCDEFG'
+        self.doc0 = Document(snapshot={})
 
+        s1 = {'first': 'some string',
+              'second': {'third':'more string',
+                         'fourth':{'numb':55}},
+              'fifth': [55,66,{'sixth': 'deep string'}, 'rw']}
+        self.doc1 = Document(snapshot=s1)
+
+        s2 = [{'name':'value'},
+              [1,2,3,4],
+              'normal, ol string',
+              [['multi'],['dimen'],['array']],
+              True,
+              None,
+              42]
+        self.doc2 = Document(snapshot=s2)
+        self.doc3 = Document(snapshot = "ABCDEFG")
         
     def test_get_id(self):
         doc = Document('abc456')
         assert doc.get_id() == 'abc456'
 
     def test_get_last_changeset(self):
-        assert self.doc0.get_last_changeset() == None
+        assert self.doc0.get_last_changeset() == self.doc0.get_root_changeset()
 
         # add a changeset and make sure it ends up last
         self.doc0.add_local_op(Op('set',[],val='abc'))
