@@ -111,6 +111,7 @@ class Document:
         cs = self.close_changeset()
         self.root_changeset = cs
         self.changesets = self.tree_to_list()
+        self.ordered_changesets = self.tree_to_list()
 
         
 
@@ -307,6 +308,11 @@ class Document:
             index += 1
 
     def tree_to_list(self):
+        """
+        The CS objects point to parents and children in order to build the
+        whole dependency tree. Take that tree and turn it into the
+        correct ordered list.
+        """
         cs = self.root_changeset
         tree_list = []
         divergence_queue = []
@@ -333,17 +339,16 @@ class Document:
                     break
                     
                 children = cs.get_children()
+                # assume this should be inserted at the end, then find
+                # the earliest cs that depends on this.
+                insertion_point = len(tree_list)
                 i = 0
                 while i < len(multiple_parents_cache):
                     if multiple_parents_cache[i].has_ancestor(cs):
-                        insertion_point = tree_list.index(multiple_parents_cache[i])
-                        break
+                        new_index = tree_list.index(multiple_parents_cache[i])
+                        insertion_point = min(new_index, insertion_point)
                     i += 1
-                # if we've cycled through all the recombining points,
-                # this is the end of a branch, so insertion_point
-                # should just be the end of the list.
-                if i == len(multiple_parents_cache):
-                    insertion_point = len(tree_list)
+                    
             if children:
                 divergence_queue += children[1:]
             
