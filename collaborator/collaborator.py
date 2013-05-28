@@ -171,7 +171,7 @@ class Collaborator:
         doc = self.get_document_by_id(m['doc_id'])
         if not doc:
             return
-        last_known_deps = doc.get_dependencies()
+        last_known_deps = []
         doc.receive_snapshot(m)
         new_css = doc.get_dependencies()
         if new_css:
@@ -210,6 +210,8 @@ class Collaborator:
                'user': doc.get_user(),
                'history': [cs.to_dict() for cs in css]
                }
+        for cs in doc.get_ordered_changesets():
+            print cs.get_id()
         self.broadcast(msg)
 
     def receive_history(self, m):
@@ -220,7 +222,6 @@ class Collaborator:
         incorporates these changes.
         """
         doc = self.get_document_by_id(m['doc_id'])
-        
         if not doc:
             return
         doc.receive_history(m)

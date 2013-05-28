@@ -15,6 +15,8 @@ class Changeset:
         self._is_snapshot_cache = False
         self.snapshot_cache = None
         self.set_dependencies(dependencies)
+        self._is_ancestor_cache = False
+        self.ancestor_cache = None
         
     def is_empty(self):
         return len(self.ops) == 0
@@ -67,6 +69,11 @@ class Changeset:
     def set_as_snapshot_cache(self, boolean):
         self._is_snapshot_cache = boolean
 
+    def set_as_ancestor_cache(self, boolean):
+        self._is_ancestor_cache = boolean
+        if boolean:
+            self.get_ancestors()
+        
     def set_snapshot_cache(self, snapshot):
         self.snapshot_cache = snapshot
 
@@ -79,11 +86,25 @@ class Changeset:
     def has_valid_snapshot_cache(self):
         return self._is_snapshot_cache and self.snapshot_cache_is_valid
 
+    def get_ancestors(self):
+        if self.parents == []:
+            return set([])
+        if self._is_ancestor_cache and self.ancestor_cache != None:
+            return self.ancestor_cache
+        r = set(self.parents)
+        for parent in self.parents:
+            r.update(parent.get_ancestors())
+        if self._is_ancestor_cache:
+            self.ancestor_cache = r
+        return r
+        
     def has_ancestor(self, ancestor):
         if len(self.parents) == 0:
             return False
-        if self == ancestor:
+        if ancestor in self.parents:
             return True
+        if self._is_ancestor_cache and self.ancestor_cache != None:
+            return ancestor in self.get_ancestors()
         for parent in self.parents:
             if parent.has_ancestor(ancestor):
                 return True
@@ -149,24 +170,20 @@ class Changeset:
         self.ops.append(op)
         return True
 
-    def relink_dependency(self, dep):
+    def relink_changesets(self, all_known_changesets):
         """
-        Returns true if a cs was relinked. False otherwise
         """
-        
         i = 0
-        while i < len(self.dependencies_with_id_only):
-            if self.dependencies_with_id_only[i] == dep.get_id():
-                self.dependencies_with_full_info.append(dep)
-                self.dependencies_with_id_only.remove(dep.get_id())
-                break
-        # TODO try to get rid of the rest of this
-        while i < len(self.dependencies):
-            if self.dependencies[i] == dep.get_id():
-                self.dependencies[i] = dep
-                return True
+        while i < len(self.parents):
+            parent = self.parents[i]
+            if not isinstance(parent, Changeset):
+                if parent in all_known_changesets:
+                    self.parents.remove(parent)
+                    self.parents.append(all_known_changesets[parent])
+            else:
+                parent = parent.get_id()
+            all_known_changesets[parent].add_child(self)
             i += 1
-        return False
 
     def get_dependency_chain(self):
         chain = set([])
@@ -199,15 +216,15 @@ class Changeset:
         # when this has no dependencies, the unacounted changesets are
         # all the previous changesets with no dependenies.
         # Constant time
-        if len(self.dependencies) == 0:
+        if len(self.parents) == 0:
             self.preceding_changesets = prev_css[:]
             return self.preceding_changesets
 
         i = len(prev_css)-1 # index to prev_css to later look through
         # With one dependency, linear time at worst. Should be closer
         # to constant time
-        if len(self.dependencies) == 1:
-            dep = self.dependencies[0]
+        if len(self.parents) == 1:
+            dep = self.parents[0]
             self.preceding_changesets = dep.get_unaccounted_changesets()
             while not prev_css[i] == dep:
                 i -= 1
@@ -216,7 +233,7 @@ class Changeset:
             # get the unique list of all unacounted changsets from
             # dependencies
             p = set([])
-            for dep in self.dependencies:
+            for dep in self.parents:
                 #TODO HERE! WRONG! Can't just add up the unaccounted
                 #changesets from deps because a cs unnaccounted in
                 # one line could be accounted for in the another

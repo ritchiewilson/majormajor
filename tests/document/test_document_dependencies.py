@@ -164,17 +164,17 @@ class TestDocumentDependencyTreeToList:
         assert doc.get_ordered_changesets() == [root,A,B,C,D,E,F]
 
         G = Changeset(doc.get_id(),"user5",[C])
-        doc.receive_changeset(G)
         G.set_id('g')
+        doc.receive_changeset(G)
         assert doc.get_ordered_changesets() == [root,A,B,C,G,D,E,F]
 
         H = Changeset(doc.get_id(),"user5",[G,F])
-        E.set_id('h')
+        H.set_id('h')
         doc.receive_changeset(H)
         assert doc.get_ordered_changesets() == [root,A,B,C,G,D,E,F,H]
 
         I = Changeset(doc.get_id(),"user6",[E])
-        F.set_id('i')
+        I.set_id('i')
         doc.receive_changeset(I)
         assert doc.get_ordered_changesets() == [root,A,B,C,G,D,E,I,F,H]
 
