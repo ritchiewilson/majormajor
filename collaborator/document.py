@@ -424,16 +424,9 @@ class Document:
 
             elif len(cs.get_parents()) > 1:
                 insertion_point = self.get_insertion_point_into_ordered_changesets(cs, tree_list)
-                    
-            
+
         return tree_list
             
-
-    def print_tree(self, tree=None):
-        if tree == None:
-            tree = self.ordered_changesets
-        for cs in tree:
-            print cs.get_id(), [dep.get_id() for dep in cs.get_parents()]
         
     # To determine if the path is valid in this document
     def contains_path(self, path):

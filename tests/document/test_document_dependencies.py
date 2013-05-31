@@ -234,22 +234,11 @@ class TestDocumentDependencyTreeToList:
         doc = Document(snapshot='')
         assert doc.get_ordered_changesets() == doc.tree_to_list()
         i = 1
-        while i < 300:
+        while i < 1000:
             doc = add_random_changeset(doc)
             i += 1
-            assert len(doc.get_ordered_changesets()) == i
-            if not doc.get_ordered_changesets() == doc.tree_to_list():
-                # doc.print_tree()
-                # print "\n"
-                # print "The Failing Tree\n"
-                # old = doc.get_ordered_changesets()
-                # doc.ordered_changesets = doc.tree_to_list()
-                # doc.print_tree()
-                # doc.ordered_changesets = old
-                # print "\n\nIncrementially adding stuff\n\n"
-                # doc.tree_to_list(True)
-                print "\n\n\n",i, " Number of CSS"
-            assert doc.get_ordered_changesets() == doc.tree_to_list()
+        assert len(doc.get_ordered_changesets()) == i
+        assert doc.get_ordered_changesets() == doc.tree_to_list()
             
 def add_random_changeset(doc):
     deps = []
