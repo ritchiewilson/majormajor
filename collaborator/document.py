@@ -203,22 +203,22 @@ class Document:
         # close the currently open changeset and get it ready for sending
         current_cs = self.close_changeset()
         if current_cs:
+            # randomly select if if this changeset should be a cache
+            if random.random() < 0.1:
+                cs.set_as_snapshot_cache(True)
+                cs.set_snapshot_cache_is_valid(False)
+                cs.set_as_ancestor_cache(True)
             self.send_queue.append(current_cs)
             
         self.add_to_known_changesets(cs)
         from datetime import datetime
         d = datetime.now()
 
-        # if this changests dependencies are the docuemtns
-        # dependencies, jsut stick it on the end
-        # if set(cs.get_parents()) == set(self.dependencies):
-        #     self.ordered_changesets.append(cs)
-        # else:
-        #     #otherwise, super expensive rebuilding
-        #     self.ordered_changesets = self.tree_to_list()
-        self.ordered_changesets = self.tree_to_list()
+        self.insert_changeset_into_ordered_list(cs)
         diff = datetime.now() - d
-        print diff.microseconds
+        #print diff.microseconds
+        #print "Number of changesets: ", len(self.ordered_changesets)
+        #print "number of all known: ", len(self.all_known_changesets.keys())
 
         for parent in cs.get_parents():
             if parent in self.dependencies:
@@ -330,6 +330,58 @@ class Document:
                 self.ordered_changesets[index].set_snapshot_cache_is_valid(True)
             index += 1
 
+    def insert_changeset_into_ordered_list(self, cs):
+        # if this changests dependencies are the docuemtns
+        # dependencies, jsut stick it on the end
+        if set(cs.get_parents()) == set(self.dependencies):
+            self.ordered_changesets.append(cs)
+            return
+
+        # if parent and child only point to each other, there's no
+        # reason to split them up, so just stick it in.
+        parents = cs.get_parents()
+        if len(parents) == 1 and parents[0].get_children() == [cs]:
+            insertion_point = self.ordered_changesets.index(parents[0]) + 1
+            self.ordered_changesets.insert(insertion_point, cs)
+            return
+
+        i = self.get_insertion_point_into_ordered_changesets(cs)
+        self.ordered_changesets.insert(i, cs)
+
+    def get_insertion_point_into_ordered_changesets(self, cs, ordered_list=None):
+        if ordered_list == None:
+            ordered_list = self.ordered_changesets
+        
+        # first get the most recent dependency
+        deps = cs.get_parents()
+        i = len(ordered_list) - 1
+        while not ordered_list[i] in deps:
+            i -= 1
+
+        # if this is the end of the list, just append
+        if i == len(ordered_list) - 1:
+            return i + 1
+
+        last_dep = ordered_list[i]
+
+        i += 1
+        if not last_dep in ordered_list[i].get_parents():
+            return i
+        
+        while i < len(ordered_list):
+            if ordered_list[i].has_ancestor(cs):
+                break
+            if last_dep in ordered_list[i].get_parents():
+                if cs.get_id() < ordered_list[i].get_id():
+                    break
+            elif not ordered_list[i].has_ancestor(last_dep):
+                break
+            i += 1
+            
+        return i
+
+        
+
     def tree_to_list(self):
         """
         The CS objects point to parents and children in order to build the
@@ -339,48 +391,50 @@ class Document:
         cs = self.root_changeset
         tree_list = []
         tree_set_cache = set([])
+        children = cs.get_children()
         divergence_queue = []
-        multiple_parents_cache = []
         insertion_point = 0
-        print "NUMBER OF CHANGESETS: ", len(self.all_known_changesets.keys())
-        while True:
-            if len(cs.get_parents()) > 1:
-                multiple_parents_cache.append(cs)
+        while not ((cs == None or cs in tree_set_cache) and len(divergence_queue) == 0):
             tree_list.insert(insertion_point, cs)
             tree_set_cache.update([cs])
             insertion_point += 1
             children = cs.get_children()
             cs = children[0] if children else None
+            if children:
+                divergence_queue += children[1:]
 
-            if (cs == None or cs in tree_set_cache) and len(divergence_queue) == 0:
-                break
-
-            if cs in tree_set_cache or cs == None:
+            if cs == None or cs in tree_set_cache or set(cs.get_parents()) - tree_set_cache != set([]):
+                if not divergence_queue:
+                    break
                 # get the next changeset from the divergency Q to start from
                 cs = divergence_queue.pop(0)
                 # make sure we've got a new cs that isn't in the list already
-                while cs in tree_set_cache and divergence_queue:
+                while (cs in tree_set_cache or set(cs.get_parents()) - tree_set_cache != set([])) and divergence_queue:
                     cs = divergence_queue.pop(0)
-                if cs in tree_set_cache and len(divergence_queue) == 0:
+                if (cs in tree_set_cache or set(cs.get_parents()) - tree_set_cache != set([])) and len(divergence_queue) == 0:
                     break
                     
                 children = cs.get_children()
+                if children:
+                    divergence_queue += children[1:]
+
                 # assume this should be inserted at the end, then find
                 # the earliest cs that depends on this.
-                insertion_point = len(tree_list)
-                i = 0
-                while i < len(multiple_parents_cache):
-                    if multiple_parents_cache[i].has_ancestor(cs):
-                        new_index = tree_list.index(multiple_parents_cache[i])
-                        insertion_point = min(new_index, insertion_point)
-                    i += 1
+                insertion_point = self.get_insertion_point_into_ordered_changesets(cs, tree_list)
+
+            elif len(cs.get_parents()) > 1:
+                insertion_point = self.get_insertion_point_into_ordered_changesets(cs, tree_list)
                     
-            if children:
-                divergence_queue += children[1:]
             
         return tree_list
             
 
+    def print_tree(self, tree=None):
+        if tree == None:
+            tree = self.ordered_changesets
+        for cs in tree:
+            print cs.get_id(), [dep.get_id() for dep in cs.get_parents()]
+        
     # To determine if the path is valid in this document
     def contains_path(self, path):
         """ Checks if the given path is valid in this document's snapshot """

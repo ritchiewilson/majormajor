@@ -56,6 +56,8 @@ class Collaborator:
     
     def close_open_changesets(self):
         for doc in self.documents:
+            for cs in doc.send_queue:
+                self.send_changeset(cs)
             oc = doc.get_open_changeset()
             if oc and not oc.is_empty():
                 cs = doc.close_changeset()

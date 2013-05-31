@@ -20,7 +20,7 @@ class Changeset:
         
     def is_empty(self):
         return len(self.ops) == 0
-
+    
     def set_dependencies(self, deps):
         """
         Split dependencies into two lists. One which holds dependencies
