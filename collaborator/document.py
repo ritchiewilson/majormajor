@@ -394,7 +394,9 @@ class Document:
         children = cs.get_children()
         divergence_queue = []
         insertion_point = 0
-        while not ((cs == None or cs in tree_set_cache) and len(divergence_queue) == 0):
+        loop_completed = False
+
+        while True:
             tree_list.insert(insertion_point, cs)
             tree_set_cache.update([cs])
             insertion_point += 1
@@ -403,30 +405,29 @@ class Document:
             if children:
                 divergence_queue += children[1:]
 
-            if cs == None or cs in tree_set_cache or set(cs.get_parents()) - tree_set_cache != set([]):
+            just_increment = True
+            while self._cs_cannot_be_inserted(cs, tree_set_cache):
+                just_increment = False
                 if not divergence_queue:
+                    loop_completed = True
                     break
-                # get the next changeset from the divergency Q to start from
-                cs = divergence_queue.pop(0)
-                # make sure we've got a new cs that isn't in the list already
-                while (cs in tree_set_cache or set(cs.get_parents()) - tree_set_cache != set([])) and divergence_queue:
-                    cs = divergence_queue.pop(0)
-                if (cs in tree_set_cache or set(cs.get_parents()) - tree_set_cache != set([])) and len(divergence_queue) == 0:
-                    break
-                    
+                cs = divergence_queue.pop()
+
+            if loop_completed:
+                break
+                
+            if not just_increment or len(cs.get_parents()) > 1:
+                insertion_point = self.get_insertion_point_into_ordered_changesets(cs, tree_list)
                 children = cs.get_children()
                 if children:
                     divergence_queue += children[1:]
 
-                # assume this should be inserted at the end, then find
-                # the earliest cs that depends on this.
-                insertion_point = self.get_insertion_point_into_ordered_changesets(cs, tree_list)
-
-            elif len(cs.get_parents()) > 1:
-                insertion_point = self.get_insertion_point_into_ordered_changesets(cs, tree_list)
-
         return tree_list
-            
+
+    def _cs_cannot_be_inserted(self, cs, tree_set_cache):
+        return (cs == None or 
+                set(cs.get_parents()) - tree_set_cache != set([]) or
+                cs in tree_set_cache)
         
     # To determine if the path is valid in this document
     def contains_path(self, path):

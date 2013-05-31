@@ -234,11 +234,17 @@ class TestDocumentDependencyTreeToList:
         doc = Document(snapshot='')
         assert doc.get_ordered_changesets() == doc.tree_to_list()
         i = 1
-        while i < 1000:
+        while i < 700:
             doc = add_random_changeset(doc)
             i += 1
         assert len(doc.get_ordered_changesets()) == i
         assert doc.get_ordered_changesets() == doc.tree_to_list()
+        from datetime import datetime
+        d = datetime.now()
+        doc = add_random_changeset(doc)
+        diff = datetime.now() - d
+        print "tree to list time: seconds: ", diff.seconds, ".", diff.microseconds
+        assert False
             
 def add_random_changeset(doc):
     deps = []
