@@ -17,7 +17,7 @@ class TestChangesetHelpers:
         cs.add_op(Op('set',[],val=''))
         assert not cs.is_empty()
 
-    def test_has_full_dependency_info(self):
+    def Xtest_has_full_dependency_info(self):
         # should always pass when it has no dependencies
         cs0 = Changeset('doc_id', 'user_id', [])
         assert cs0.has_full_dependency_info()
@@ -38,7 +38,7 @@ class TestChangesetHelpers:
         cs6 = Changeset('doc_id', 'user_id', [cs5, 'otherid'])
         assert not cs6.has_full_dependency_info()
 
-    def test_get_dependency_ids(self):
+    def Xtest_get_dependency_ids(self):
         cs0 = Changeset('doc_id', 'user_id', [])
         assert cs0.get_dependency_ids() == []
         

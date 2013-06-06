@@ -234,22 +234,55 @@ class TestDocumentDependencyTreeToList:
         doc = Document(snapshot='')
         assert doc.get_ordered_changesets() == doc.tree_to_list()
         i = 1
-        while i < 100:
-            doc = add_random_changeset(doc)
+        while i < 1000:
             i += 1
+            doc, cs = add_random_changeset(doc)
             assert len(doc.get_ordered_changesets()) == i
-            assert doc.get_ordered_changesets() == doc.tree_to_list()
-            
+
+        assert doc.get_ordered_changesets() == doc.tree_to_list()
+
+
+NAME_INDEX = 0 # a counter to add to user names so hashes don't collide
 def add_random_changeset(doc):
+    """
+    Create a changeset with random, valid dependencies. Then insert
+    them into the doc and return it.
+    """
+    
     deps = []
-    if random.random() > .5:
+    if random.random() > .2:
+        """
+        In this case, just pick a sample from the document's dependencies
+        """
         number_of_deps = random.randrange(0,len(doc.get_dependencies()), 1) + 1
         deps = random.sample(doc.get_dependencies(), number_of_deps)
     else:
+        """
+        Otherwise pick a random changeset, then at most 4 more changesets
+        which are not ancestors of each other.
+        """
         deps = [random.choice(doc.get_ordered_changesets())]
-    # Need to randomize user names here, otherwise lots of CSs with same hashcode
-    user = ''.join(random.choice(string.ascii_letters + string.digits)
-                          for x in range(5))
+        x = random.random()
+        while x > .2 and len(deps) < 5:
+            if x > .6:
+                new_dep = random.choice(doc.get_dependencies())
+            else:
+                new_dep = random.choice(doc.get_ordered_changesets())
+            insert = True
+            for dep in deps:
+                if dep.has_ancestor(new_dep) or new_dep.has_ancestor(dep):
+                    insert = False
+            if insert:
+                deps.append(new_dep)
+            x = random.random()
+            
+    # Need to increment user names here, otherwise lots of CSs with same hashcode
+    user = str(NAME_INDEX)
+    global NAME_INDEX
+    NAME_INDEX += 1
+    
     cs = Changeset(doc.get_id(), user, deps)
+    #doc.add_to_known_changesets(cs)
+    #doc.insert_changeset_into_ordered_list(cs)
     doc.receive_changeset(cs)
-    return doc
+    return doc, cs

@@ -200,39 +200,32 @@ class Document:
             dep_ids = self.get_missing_dependency_ids(cs)
             self.missing_changesets += dep_ids
             return False
+
         # close the currently open changeset and get it ready for sending
         current_cs = self.close_changeset()
         if current_cs:
             # randomly select if if this changeset should be a cache
-            if random.random() < 0.1:
+            if random.random() < 0.01:
                 cs.set_as_snapshot_cache(True)
                 cs.set_snapshot_cache_is_valid(False)
-                cs.set_as_ancestor_cache(True)
             self.send_queue.append(current_cs)
-            
+
         self.add_to_known_changesets(cs)
-        from datetime import datetime
-        d = datetime.now()
-
         self.insert_changeset_into_ordered_list(cs)
-        diff = datetime.now() - d
-        #print diff.microseconds
-        #print "Number of changesets: ", len(self.ordered_changesets)
-        #print "number of all known: ", len(self.all_known_changesets.keys())
 
+        # remove document dependencies covered by this new changeset
         for parent in cs.get_parents():
             if parent in self.dependencies:
                 self.dependencies.remove(parent)
         self.dependencies.append(cs)
         
         #self.ot()
-        self.rebuild_snapshot()
+        #self.rebuild_snapshot()
         
         # randomly select if if this changeset should be a cache
-        if random.random() < 0.1:
+        if random.random() < 0.01:
             cs.set_as_snapshot_cache(True)
             cs.set_snapshot_cache_is_valid(False)
-            cs.set_as_ancestor_cache(True)
         
         return True
 
@@ -331,19 +324,11 @@ class Document:
             index += 1
 
     def insert_changeset_into_ordered_list(self, cs):
-        # if this changests dependencies are the docuemtns
-        # dependencies, jsut stick it on the end
-        if set(cs.get_parents()) == set(self.dependencies):
-            self.ordered_changesets.append(cs)
-            return
-
-        # if parent and child only point to each other, there's no
-        # reason to split them up, so just stick it in.
-        parents = cs.get_parents()
-        if len(parents) == 1 and parents[0].get_children() == [cs]:
-            insertion_point = self.ordered_changesets.index(parents[0]) + 1
-            self.ordered_changesets.insert(insertion_point, cs)
-            return
+        """
+        When there is just one new changeset to add, there is no need to
+        build the whole tree. Just insert this one into place in the ordered
+        list.
+        """
 
         i = self.get_insertion_point_into_ordered_changesets(cs)
         self.ordered_changesets.insert(i, cs)
@@ -358,16 +343,9 @@ class Document:
         while not ordered_list[i] in deps:
             i -= 1
 
-        # if this is the end of the list, just append
-        if i == len(ordered_list) - 1:
-            return i + 1
-
         last_dep = ordered_list[i]
 
-        i += 1
-        if not last_dep in ordered_list[i].get_parents():
-            return i
-        
+        i += 1        
         while i < len(ordered_list):
             if ordered_list[i].has_ancestor(cs):
                 break

@@ -16,7 +16,7 @@ class Changeset:
         self.snapshot_cache = None
         self.set_dependencies(dependencies)
         self._is_ancestor_cache = False
-        self.ancestor_cache = None
+        self.set_as_ancestor_cache()
         
     def is_empty(self):
         return len(self.ops) == 0
@@ -57,6 +57,7 @@ class Changeset:
             for child in self.children:
                 if child.get_id() == _id:
                     ret.append(child)
+                    break
         self.children = ret
 
 
@@ -69,10 +70,19 @@ class Changeset:
     def set_as_snapshot_cache(self, boolean):
         self._is_snapshot_cache = boolean
 
-    def set_as_ancestor_cache(self, boolean):
+    def set_as_ancestor_cache(self, boolean=None):
+        # if not specified, this changeset should be randomly assigned
+        # to be a cache. If it has multiple parents it should be far
+        # more likely to be a cache, in order to best reduce
+        # complexity. If it has one parent, low chance of being a
+        # cache
+        if boolean == None:
+            x = random.random()
+            boolean = x < 0.6 if len(self.get_parents()) > 1 else x < 0.07
+        self.ancestor_cache = None
         self._is_ancestor_cache = boolean
         if boolean:
-            self.get_ancestors()
+            self.ancestor_cache = self.get_ancestors()
         
     def set_snapshot_cache(self, snapshot):
         self.snapshot_cache = snapshot
@@ -91,12 +101,12 @@ class Changeset:
             return set([])
         if self._is_ancestor_cache and self.ancestor_cache != None:
             return self.ancestor_cache
-        r = set(self.parents)
+        ancestors = set(self.parents)
         for parent in self.parents:
-            r.update(parent.get_ancestors())
+            ancestors.update(parent.get_ancestors())
         if self._is_ancestor_cache:
-            self.ancestor_cache = r
-        return r
+            self.ancestor_cache = ancestors
+        return ancestors
         
     def has_ancestor(self, ancestor):
         if len(self.parents) == 0:
@@ -121,9 +131,7 @@ class Changeset:
         return True
 
     def get_dependency_ids(self):
-        dep_ids = self.dependencies_with_id_only[:]
-        for dep in self.dependencies_with_full_info:
-            dep_ids.append(dep.get_id())
+        dep_ids = [dep.get_id() for dep in self.parents]
         dep_ids.sort()
         return dep_ids
 
