@@ -131,7 +131,12 @@ class Changeset:
         return True
 
     def get_dependency_ids(self):
-        dep_ids = [dep.get_id() for dep in self.parents]
+        dep_ids = []
+        for dep in self.parents:
+            if isinstance(dep, Changeset):
+                dep_ids.append(dep.get_id())
+            else:
+                dep_ids.append(dep)
         dep_ids.sort()
         return dep_ids
 

@@ -220,7 +220,7 @@ class Document:
         self.dependencies.append(cs)
         
         #self.ot()
-        #self.rebuild_snapshot()
+        self.rebuild_snapshot()
         
         # randomly select if if this changeset should be a cache
         if random.random() < 0.01:
@@ -250,9 +250,6 @@ class Document:
             self.add_to_known_changesets(hcs)
         self.relink_changesets()
         self.ordered_changesets = self.tree_to_list()
-        for cs in self.ordered_changesets:
-            print cs.get_id()
-            print cs.get_parents()
         prev = []
         for cs in self.ordered_changesets:
             cs.find_unaccounted_changesets(prev)
