@@ -30,7 +30,7 @@ class TextViewWindow(Gtk.Window):
         self.document = self.collaborator.new_document(snapshot='')
         self.collaborator.connect('remote-cursor-update', self.remote_cursor_update)
         self.collaborator.connect('receive-changeset', self.receive_changeset)
-        self.collaborator.connect('receive-snapshot', self.receive_changeset)
+        self.collaborator.connect('receive-snapshot', self.receive_snapshot)
         self.collaborator.connect('accept-invitation', self.accept_invitation)
 
     def accept_invitation(self, doc):
@@ -58,13 +58,38 @@ class TextViewWindow(Gtk.Window):
         s.document.add_local_op(op)
         print 'deleting'
         
-    def receive_changeset(self):
+    def receive_changeset(self, opcodes):
         h_ids = self.collaborator_handlers
         with self.textbuffer.handler_block(h_ids['insert-text']):
             with self.textbuffer.handler_block(h_ids['delete-range']):
-                self.textbuffer.set_text(self.document.get_snapshot())
-        #print self.document.get_snapshot(), ' receive'
-        #print ' receive'
+                self.apply_opcodes(opcodes)
+
+    def apply_opcodes(self, opcodes):
+        index = 0
+        for op in opcodes:
+            it = self.textbuffer.get_iter_at_offset(op[2] + index)
+            if op[0] == 'insert':
+                self.textbuffer.insert(it, op[3])
+                index += len(op[3])
+            elif op[0] == 'delete':
+                end = self.textbuffer.get_iter_at_offset(op[2] + op[3] + index)
+                self.textbuffer.delete(it, end)
+                index -= op[3]
+            elif op[0] == 'replace':
+                end = self.textbuffer.get_iter_at_offset(op[2] + op[3] + index)
+                self.textbuffer.delete(it, end)
+                it = self.textbuffer.get_iter_at_offset(op[2] + index)
+                self.textbuffer.insert(it, op[4])
+                index += (len(op[4]) - op[3])
+                
+            
+                
+
+    def receive_snapshot(self, snapshot):
+        h_ids = self.collaborator_handlers
+        with self.textbuffer.handler_block(h_ids['insert-text']):
+            with self.textbuffer.handler_block(h_ids['delete-range']):
+                self.textbuffer.set_text(snapshot)
 
     def create_toolbar(self):
         toolbar = Gtk.Toolbar()

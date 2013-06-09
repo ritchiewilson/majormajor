@@ -79,9 +79,9 @@ class Changeset:
         if boolean == None:
             x = random.random()
             boolean = x < 0.6 if len(self.get_parents()) > 1 else x < 0.07
-        self.ancestor_cache = None
         self._is_ancestor_cache = boolean
         if boolean:
+            self.ancestor_cache = None
             self.ancestor_cache = self.get_ancestors()
         
     def set_snapshot_cache(self, snapshot):

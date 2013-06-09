@@ -1,7 +1,7 @@
 from document import Document
 from changeset import Changeset
 from op import Op
-import socket
+import socket, copy, difflib
 import json
 import sys
 import uuid
@@ -36,7 +36,7 @@ class Collaborator:
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.s.bind((HOST, PORT))
         GObject.io_add_watch(self.s, GObject.IO_IN, self._listen_callback)
-        GObject.timeout_add(10, self.test_thousands_ops)
+        GObject.timeout_add(20, self.test_thousands_ops)
         GObject.timeout_add(75, self.close_open_changesets)
         self.announce()
         self.big_insert = False
@@ -44,14 +44,17 @@ class Collaborator:
 
     def test_thousands_ops(self):
         if self.big_insert:
+            doc = self.documents[0]
             import random, string
-            o = random.randint(0, len(self.documents[0].get_snapshot()))
-            l = unicode(random.choice(string.ascii_letters + string.digits))
-            self.documents[0].add_local_op(Op('si',[],offset=o,val=l))
-            cs = self.documents[0].close_changeset()
+            o = random.randint(0, len(doc.get_snapshot()))
+            l = unicode(''.join(random.choice(string.ascii_letters + string.digits)
+                                for x in range(200)))
+
+            doc.add_local_op(Op('si',[],offset=o,val=l))
+            cs = doc.close_changeset()
             self.send_changeset(cs)
             for callback in self.signal_callbacks['receive-snapshot']:
-                callback()
+                callback(doc.get_snapshot())
         return True
     
     def close_open_changesets(self):
@@ -179,7 +182,7 @@ class Collaborator:
         if new_css:
             self.request_history(doc, new_css, last_known_deps)
         for callback in self.signal_callbacks['receive-snapshot']:
-            callback()
+            callback(doc.get_snapshot())
 
     def request_history(self, doc, new_css, last_known_css):
         """
@@ -339,11 +342,14 @@ class Collaborator:
         if not doc:
             return
 
+        old_state = copy.deepcopy(doc.get_snapshot())
         if not doc.receive_changeset(m):
             return
 
+        opcodes = doc.get_diff_opcode(old_state)
+
         for callback in self.signal_callbacks['receive-changeset']:
-            callback()
+            callback(opcodes)
 
     signal_callbacks = {
         'receive-changeset' : [],

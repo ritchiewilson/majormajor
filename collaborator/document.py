@@ -1,4 +1,4 @@
-import json
+import json, difflib
 import random
 import string
 import uuid
@@ -403,6 +403,30 @@ class Document:
         return (cs == None or 
                 set(cs.get_parents()) - tree_set_cache != set([]) or
                 cs in tree_set_cache)
+
+    def get_diff_opcode(self, old_state):
+        """
+        Accept an old snapshot and get the opcodes which turn it into the
+        current snapshot.
+        TODO: this is only set up for strings right now. 
+        """
+        new_state = self.get_snapshot()
+        diff = difflib.SequenceMatcher(None, old_state, new_state)
+        path = [] # just working with strings. path is always root
+        opcodes = []
+        for tag, i1, i2, j1, j2 in diff.get_opcodes():
+            if tag == 'insert':
+                txt = self.get_snapshot()[j1:j2]
+                opcodes.append((tag, path, i1, txt))
+            elif tag == 'delete':
+                opcodes.append((tag, path, i1, (i2 - i1)))
+            elif tag == 'replace':
+                txt = self.get_snapshot()[j1:j2]
+                opcodes.append(('replace', path, i1, (i2 - i1), txt))
+
+        return opcodes
+        
+
         
     # To determine if the path is valid in this document
     def contains_path(self, path):
