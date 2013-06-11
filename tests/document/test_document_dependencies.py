@@ -231,10 +231,16 @@ class TestDocumentDependencyTreeToList:
         assert doc.get_ordered_changesets() == doc.tree_to_list()
 
     def test_random_changesets(self):
+        """
+        Create a bunch of changesets with random dependencies, add them
+        all to the doc, and make sure the resulting order is the same
+        as when done with tree_to_list().
+        """
+        NUMBER_OF_CHANGESETS = 500
         doc = Document(snapshot='')
         assert doc.get_ordered_changesets() == doc.tree_to_list()
         i = 1
-        while i < 1000:
+        while i < NUMBER_OF_CHANGESETS:
             i += 1
             doc, cs = add_random_changeset(doc)
             assert len(doc.get_ordered_changesets()) == i
@@ -261,13 +267,13 @@ def add_random_changeset(doc):
         Otherwise pick a random changeset, then at most 4 more changesets
         which are not ancestors of each other.
         """
-        deps = [random.choice(doc.get_ordered_changesets())]
+        deps = [random.choice(doc.get_ordered_changesets()[-100:])]
         x = random.random()
         while x > .2 and len(deps) < 5:
             if x > .6:
                 new_dep = random.choice(doc.get_dependencies())
             else:
-                new_dep = random.choice(doc.get_ordered_changesets())
+                new_dep = random.choice(doc.get_ordered_changesets()[-100:])
             insert = True
             for dep in deps:
                 if dep.has_ancestor(new_dep) or new_dep.has_ancestor(dep):

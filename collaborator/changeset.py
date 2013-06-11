@@ -225,6 +225,21 @@ class Changeset:
             raise Exception("Preceding Changesets not yet known")
         return self.preceding_changesets[:]
 
+    def add_to_unaccounted_changesets(self, cs, index, doc):
+        ordered_changesets = doc.get_ordered_changesets()
+        i = index
+        insertion_point = 0
+        while i < len(ordered_changesets):
+            if ordered_changesets[i] == self:
+                insertion_point = len(self.get_unaccounted_changesets())
+                break
+            if ordered_changesets[i] in self.preceding_changesets:
+                insertion_point = self.preceding_changesets.index(ordered_changesets[i])
+                break
+            i += 1
+        self.preceding_changesets.insert(insertion_point, cs)
+
+
     def find_unaccounted_changesets(self, prev_css):
         # when this has no dependencies, the unacounted changesets are
         # all the previous changesets with no dependenies.
@@ -272,13 +287,11 @@ class Changeset:
         self.preceding_changesets += prev_css[i+1:]
         return self.preceding_changesets
         
-    def transform_from_preceding_changesets(self, prev_css):
+    def ot(self):
         """
-        pcs is a list of all known changesets that come before this
-        one. Figure out which ones in that list are not a dependency
-        of this one. If it is not a dependency of this one, the
-        operations in this changeset need to go through opperational
-        transformation for it.
+        All the unaccounted changesets should have already been
+        determined. Loop through those, using them to transform this
+        changeset.
         """
         # those 'preceding_changesets' need to be used to transform
         # this changeset's operations.

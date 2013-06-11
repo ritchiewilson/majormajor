@@ -48,7 +48,7 @@ class Collaborator:
             import random, string
             o = random.randint(0, len(doc.get_snapshot()))
             l = unicode(''.join(random.choice(string.ascii_letters + string.digits)
-                                for x in range(200)))
+                                for x in range(1)))
 
             doc.add_local_op(Op('si',[],offset=o,val=l))
             cs = doc.close_changeset()

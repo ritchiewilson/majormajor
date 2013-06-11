@@ -211,16 +211,19 @@ class Document:
             self.send_queue.append(current_cs)
 
         self.add_to_known_changesets(cs)
-        self.insert_changeset_into_ordered_list(cs)
+        i = self.insert_changeset_into_ordered_list(cs)
+        self.update_unaccounted_changesets(cs)
+        
+        self.ot(i)
+        self.rebuild_snapshot()
 
         # remove document dependencies covered by this new changeset
         for parent in cs.get_parents():
             if parent in self.dependencies:
                 self.dependencies.remove(parent)
         self.dependencies.append(cs)
-        
-        #self.ot()
-        self.rebuild_snapshot()
+        if len(cs.get_parents()) > 1:
+            print "HIP HIP"
         
         # randomly select if if this changeset should be a cache
         if random.random() < 0.01:
@@ -271,23 +274,15 @@ class Document:
                 p.add_child(cs)
         
 
-    def ot(self, start):
+    def ot(self, start=0):
         """
         Perform opperational transformation on all changesets from
         start onwards.
         """
-        prev = self.ordered_changesets[:start]
-        new_cs = self.ordered_changesets[start]
-        new_cs.find_unaccounted_changesets(prev)
-        new_cs.transform_from_preceding_changesets(prev)
-
-        prev.append(new_cs)
-        to_transfrom = self.ordered_changesets[start+1:]
-        for cs in to_transfrom:
-            cs.find_unaccounted_changesets(prev)
-            cs.transform_from_preceding_changesets(prev)
-            prev.append(cs)
-
+        i = start
+        while i < len(self.ordered_changesets):
+            self.ordered_changesets[i].ot()
+            i += 1
         
     def has_needed_dependencies(self, cs):
         """
@@ -320,6 +315,44 @@ class Document:
                 self.ordered_changesets[index].set_snapshot_cache_is_valid(True)
             index += 1
 
+    def update_unaccounted_changesets(self, cs):
+        """
+        cs has just been inserted into the list. First find all
+        unaccounted changesets which come before it. Then add this
+        changeset to each subsequent changeset which needs it. (all?)
+        """
+        unaccounted_css = []
+        deps = cs.get_parents()
+        pos_of_cs = self.ordered_changesets.index(cs)
+        i = pos_of_cs - 1
+        while deps and i > 0:
+            old_cs = self.ordered_changesets[i]
+            if old_cs in deps:
+                unaccounted_css = old_cs.get_unaccounted_changesets() + unaccounted_css
+                deps.remove(old_cs)
+            elif not cs.has_ancestor(old_cs):
+                unaccounted_css.insert(0, old_cs)
+            i -= 1
+        i = 0
+        while i < len(unaccounted_css):
+            past_cs = unaccounted_css[i]
+            if cs.has_ancestor(past_cs ):
+                unaccounted_css.remove(past_cs)
+            i += 1
+        cs.set_unaccounted_changesets(unaccounted_css)
+
+        # now add the given cs to all subsequent changesets which need it
+        i = pos_of_cs + 1
+        index = self.get_ordered_changesets().index(cs)
+        while i < len(self.ordered_changesets):
+            future_cs = self.ordered_changesets[i]
+            parents = future_cs.get_parents()
+            if len(parents) == 1:
+                future_cs.set_unaccounted_changesets(parents[0].get_unaccounted_changesets())
+            else:
+                future_cs.add_to_unaccounted_changesets(cs,index, self)
+            i += 1
+        
     def insert_changeset_into_ordered_list(self, cs):
         """
         When there is just one new changeset to add, there is no need to
@@ -329,6 +362,7 @@ class Document:
 
         i = self.get_insertion_point_into_ordered_changesets(cs)
         self.ordered_changesets.insert(i, cs)
+        return i
 
     def get_insertion_point_into_ordered_changesets(self, cs, ordered_list=None):
         if ordered_list == None:
