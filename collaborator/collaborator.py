@@ -46,11 +46,21 @@ class Collaborator:
         if self.big_insert:
             doc = self.documents[0]
             import random, string
+            n = random.randint(1,5)
             o = random.randint(0, len(doc.get_snapshot()))
-            l = unicode(''.join(random.choice(string.ascii_letters + string.digits)
-                                for x in range(1)))
-
-            doc.add_local_op(Op('si',[],offset=o,val=l))
+            if random.random() > .3 or len(doc.get_snapshot()) == 0:
+                l = unicode(''.join(random.choice(string.ascii_letters + string.digits)
+                                    for x in range(n)))
+                
+                doc.add_local_op(Op('si',[],offset=o,val=l))
+            else:
+                while o + n > len(doc.get_snapshot()):
+                    n -= 1
+                if o == len(doc.get_snapshot()):
+                    o -= 1
+                    n = 1
+                doc.add_local_op(Op('sd',[],offset=0,val=n))
+                
             cs = doc.close_changeset()
             self.send_changeset(cs)
             for callback in self.signal_callbacks['receive-snapshot']:

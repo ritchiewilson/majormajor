@@ -95,17 +95,25 @@ class TextViewWindow(Gtk.Window):
         toolbar = Gtk.Toolbar()
         self.grid.attach(toolbar, 0, 0, 3, 1)
 
-        button_bold = Gtk.ToolButton.new_from_stock(Gtk.STOCK_BOLD)
-        toolbar.insert(button_bold, 0)
+        button_save = Gtk.ToolButton.new_from_stock(Gtk.STOCK_SAVE)
+        toolbar.insert(button_save, 0)
 
-        button_italic = Gtk.ToolButton.new_from_stock(Gtk.STOCK_ITALIC)
-        toolbar.insert(button_italic, 1)
+        button_random = Gtk.ToolButton.new_from_stock(Gtk.STOCK_MEDIA_RECORD)
+        toolbar.insert(button_random, 1)
+
+        #button_bold = Gtk.ToolButton.new_from_stock(Gtk.STOCK_BOLD)
+        #toolbar.insert(button_bold, 0)
+
+        #button_italic = Gtk.ToolButton.new_from_stock(Gtk.STOCK_ITALIC)
+        #toolbar.insert(button_italic, 1)
 
         button_underline = Gtk.ToolButton.new_from_stock(Gtk.STOCK_UNDERLINE)
         toolbar.insert(button_underline, 2)
-
-        button_bold.connect("clicked", self.on_button_clicked, self.tag_bold)
-        button_italic.connect("clicked", self.on_button_clicked, self.tag_italic)
+        
+        button_save.connect("clicked", self.on_save_clicked)
+        button_random.connect("clicked", self.on_random_clicked)
+        #button_bold.connect("clicked", self.on_button_clicked, self.tag_bold)
+        #button_italic.connect("clicked", self.on_button_clicked, self.tag_italic)
         button_underline.connect("clicked", self.on_button_clicked, self.tag_underline)
 
         toolbar.insert(Gtk.SeparatorToolItem(), 3)
@@ -195,6 +203,20 @@ class TextViewWindow(Gtk.Window):
         radio_wrapchar.connect("toggled", self.on_wrap_toggled, Gtk.WrapMode.CHAR)
         radio_wrapword.connect("toggled", self.on_wrap_toggled, Gtk.WrapMode.WORD)
 
+    def on_save_clicked(self, widget):
+        import random
+        n = "".join([random.choice("abcdef") for x in range(3)])
+        n = "buffer-" + n + ".txt"
+        f = open(n, 'w')
+        start = self.textbuffer.get_start_iter()
+        end = self.textbuffer.get_end_iter()
+        f.write(self.textbuffer.get_text(start, end,True))
+        f.close()
+        print "saved"
+    
+    def on_random_clicked(self, widget):
+        self.collaborator.big_insert = not self.collaborator.big_insert
+    
     def on_button_clicked(self, widget, tag):
         self.collaborator.big_insert = not self.collaborator.big_insert
 

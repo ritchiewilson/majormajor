@@ -293,6 +293,8 @@ class Changeset:
         determined. Loop through those, using them to transform this
         changeset.
         """
+        for op in self.ops:
+            op.reset_transformations()
         # those 'preceding_changesets' need to be used to transform
         # this changeset's operations.
         for pc in self.preceding_changesets:

@@ -214,7 +214,7 @@ class Document:
         i = self.insert_changeset_into_ordered_list(cs)
         self.update_unaccounted_changesets(cs)
         
-        self.ot(i)
+        self.ot(i-1)
         self.rebuild_snapshot()
 
         # remove document dependencies covered by this new changeset
@@ -328,9 +328,12 @@ class Document:
         while deps and i > 0:
             old_cs = self.ordered_changesets[i]
             if old_cs in deps:
-                unaccounted_css = old_cs.get_unaccounted_changesets() + unaccounted_css
+                if len(deps) == 1:
+                    # if this is the last dep, then cs shares it's unknown dependencies
+                    unaccounted_css = old_cs.get_unaccounted_changesets() + unaccounted_css
+                    break
                 deps.remove(old_cs)
-            elif not cs.has_ancestor(old_cs):
+            elif not cs.has_ancestor(old_cs) and not old_cs in unaccounted_css:
                 unaccounted_css.insert(0, old_cs)
             i -= 1
         i = 0
@@ -338,19 +341,15 @@ class Document:
             past_cs = unaccounted_css[i]
             if cs.has_ancestor(past_cs ):
                 unaccounted_css.remove(past_cs)
-            i += 1
+            else:
+                i += 1
         cs.set_unaccounted_changesets(unaccounted_css)
 
         # now add the given cs to all subsequent changesets which need it
         i = pos_of_cs + 1
-        index = self.get_ordered_changesets().index(cs)
         while i < len(self.ordered_changesets):
             future_cs = self.ordered_changesets[i]
-            parents = future_cs.get_parents()
-            if len(parents) == 1:
-                future_cs.set_unaccounted_changesets(parents[0].get_unaccounted_changesets())
-            else:
-                future_cs.add_to_unaccounted_changesets(cs,index, self)
+            future_cs.add_to_unaccounted_changesets(cs,pos_of_cs, self)
             i += 1
         
     def insert_changeset_into_ordered_list(self, cs):

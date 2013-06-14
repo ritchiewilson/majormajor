@@ -34,7 +34,13 @@ class Op:
              'val': self.val,
              'offset': self.offset}
         return s
-    
+
+    def reset_transformations(self):
+        self.t_action = self.action
+        self.t_path = self.path
+        self.t_val = self.val
+        self.t_offset = self.offset
+
     def ot(self, pc):
         """
         pc: Changeset - previous changeset which has been applied but
