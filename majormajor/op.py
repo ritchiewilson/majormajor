@@ -1,8 +1,17 @@
-class Op:
+class Op(object):
     """
     offset is only used for string manipulation
     
     """
+    def __new__(cls, *args, **kwargs):
+        subclass = {'si': StringInsertOp,
+                    'sd': StringDeleteOp,
+                    'set': SetOp }.get(args[0], cls)
+        
+        new_instance = object.__new__(subclass, *args, **kwargs)
+        return new_instance
+        
+        
     def __init__(self, action, path, val=None, offset=None):
         # These are the canonical original intentions. They are what's
         # actually stored in databases and sent to peers. Once set,
@@ -57,15 +66,35 @@ class Op:
         Transform this opperation when a previously unknown opperation
         did a string insert.
 
-        A past string insert only changes this opperation if 1) this
-        is a string insert or string delete and 2) the two opperations
-        have identical paths.
-
-        If so, shift offset and possibly val
+        In the default case, pass
         """
-        if self.t_action != 'si' and self.t_action != 'sd':
-            return
+        pass
+        
+    def string_delete_transform(self, op):
+        """
+        Transform this opperation when a previously unknown opperation
+        did a string deletion.
 
+        In all default cases, do nothing
+        """
+        pass
+                
+
+    json_opperations = {
+        'set': 'set_value',
+        'bn' : 'boolean_negation',
+        'na' : 'number_add',
+        'si' : 'string_insert_transform',
+        'sd' : 'string_delete_transform',
+        'ai' : 'array_insert',
+        'ad' : 'array_delete',
+        'am' : 'array_move',
+        'oi' : 'object_insert',
+        'od' : 'object_delete'
+    }
+
+class StringInsertOp(Op):
+    def string_insert_transform(self, op):
         if self.t_path != op.t_path:
             return
 
@@ -73,41 +102,44 @@ class Op:
             if self.t_offset >= op.t_offset:
                 self.t_offset += len(op.t_val)
 
-        elif self.t_action == 'sd':
-            # if text was inserted into the deletion range, expand the
-            # range to delete that text as well.
-            if self.t_offset + self.t_val > op.t_offset and self.t_offset < op.t_offset:
-                self.t_val += len(op.t_val)
-            # if the insertion comes before deletion range, shift
-            # deletion range forward
-            if self.t_offset >= op.t_offset:
-                self.t_offset += len(op.t_val)                
+    def string_delete_transform(self, op):
+        """
+        Transform this opperation when a previously unknown opperation
+        did a string deletion.
+        """
+        if self.t_path != op.t_path:
+            return
+
+        if self.t_offset >= op.t_offset + op.t_val:
+            self.t_offset -= op.t_val
+        elif self.t_offset > op.t_offset:
+            self.t_offset = op.t_offset
+            self.t_val = ''
+ 
+        
+class StringDeleteOp(Op):
+    
+    def string_insert_transform(self, op):
+        if self.t_path != op.t_path:
+            return
+
+        # if text was inserted into the deletion range, expand the
+        # range to delete that text as well.
+        if self.t_offset + self.t_val > op.t_offset and self.t_offset < op.t_offset:
+            self.t_val += len(op.t_val)
+        # if the insertion comes before deletion range, shift
+        # deletion range forward
+        elif self.t_offset >= op.t_offset:
+            self.t_offset += len(op.t_val)
 
     def string_delete_transform(self, op):
         """
         Transform this opperation when a previously unknown opperation
         did a string deletion.
-
-        A past string insert only changes this opperation if 1) this
-        is a string insert or string delete and 2) the two opperations
-        have identical paths.
-        
-        If so, shift offset and possibly val
         """
-        if self.t_action != 'si' and self.t_action != 'sd':
-            return
-        
         if self.t_path != op.t_path:
             return
-
-        if self.t_action == 'si':
-            if self.t_offset >= op.t_offset + op.t_val:
-                self.t_offset -= op.t_val
-            elif self.t_offset > op.t_offset:
-                self.t_offset = op.t_offset
-                self.t_val = ''
-
-
+            
         # there are six ways two delete ranges can overlap and
         # each one is a different case.
         if self.t_action == 'sd':
@@ -128,19 +160,7 @@ class Op:
                 self.t_val -= op.t_val
             else:
                 self.t_val = op.t_offset - self.t_offset
-                
-                
 
-    json_opperations = {
-        'set': 'set_value',
-        'bn' : 'boolean_negation',
-        'na' : 'number_add',
-        'si' : 'string_insert_transform',
-        'sd' : 'string_delete_transform',
-        'ai' : 'array_insert',
-        'ad' : 'array_delete',
-        'am' : 'array_move',
-        'oi' : 'object_insert',
-        'od' : 'object_delete'
-    }
-
+class SetOp(Op):
+    pass
+    
