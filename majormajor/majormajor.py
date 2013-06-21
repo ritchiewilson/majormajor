@@ -18,7 +18,7 @@ if len(sys.argv) > 1:
     DEFAULT_COLLABORATOR_PORT = 8000
 
 
-class Collaborator:
+class MajorMajor:
     # TODO: user authentication
 
     def __init__(self):
@@ -92,7 +92,7 @@ class Collaborator:
 
     def get_document_by_id(self, doc_id):
         """
-        A Collaborator can hold multiple documents. Get the relevent
+        A MajorMajor can hold multiple documents. Get the relevent
         document by doc_id.
         """
         for doc in self.documents:
@@ -338,7 +338,7 @@ class Collaborator:
         
     def connect(self, signal, callback):
         """
-        Let clients connect to Collaborator by defining callbacks for
+        Let clients connect to MajorMajor by defining callbacks for
         various signals.
         """
         self.signal_callbacks[signal].append(callback)

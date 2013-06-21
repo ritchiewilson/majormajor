@@ -1,12 +1,12 @@
-from collaborator.collaborator import Collaborator
-from collaborator.document import Document
+from majormajor.majormajor import MajorMajor
+from majormajor.document import Document
 
 
 
-class TestCollaboratorHelpers:
+class TestMajorMajorHelpers:
 
     def setup_method(self, method):
-        self.collab0 = Collaborator()
+        self.collab0 = MajorMajor()
         
     def test_new_document(self):
         # leaving nothing specified

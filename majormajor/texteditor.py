@@ -1,5 +1,5 @@
 from gi.repository import Gtk, Pango
-from collaborator import Collaborator
+from majormajor import MajorMajor
 from op import Op
 
 
@@ -17,28 +17,28 @@ class TextViewWindow(Gtk.Window):
         self.create_toolbar()
         self.create_buttons()
 
-        self.create_collaborator()
+        self.glue_majormajor()
 
-    def create_collaborator(self):
+    def glue_majormajor(self):
         
         i_id = self.textbuffer.connect('insert-text', self.insert_text_handler)
         d_id = self.textbuffer.connect('delete-range', self.delete_range_handler)
-        self.collaborator_handlers = {'insert-text':i_id, 'delete-range':d_id}
+        self.majormajor_handlers = {'insert-text':i_id, 'delete-range':d_id}
 
         
-        self.collaborator = Collaborator()
-        self.document = self.collaborator.new_document(snapshot='')
-        self.collaborator.connect('remote-cursor-update', self.remote_cursor_update)
-        self.collaborator.connect('receive-changeset', self.receive_changeset)
-        self.collaborator.connect('receive-snapshot', self.receive_snapshot)
-        self.collaborator.connect('accept-invitation', self.accept_invitation)
+        self.majormajor = MajorMajor()
+        self.document = self.majormajor.new_document(snapshot='')
+        self.majormajor.connect('remote-cursor-update', self.remote_cursor_update)
+        self.majormajor.connect('receive-changeset', self.receive_changeset)
+        self.majormajor.connect('receive-snapshot', self.receive_snapshot)
+        self.majormajor.connect('accept-invitation', self.accept_invitation)
 
     def accept_invitation(self, doc):
         self.document = doc
         
     def remote_cursor_update(self):
         buf = self.textbuffer
-        for i in self.collaborator.connections:
+        for i in self.majormajor.connections:
             m = buf.get_mark(i.user)
             if m != None:
                 buf.delete_mark(m)
@@ -59,7 +59,7 @@ class TextViewWindow(Gtk.Window):
         print 'deleting'
         
     def receive_changeset(self, opcodes):
-        h_ids = self.collaborator_handlers
+        h_ids = self.majormajor_handlers
         with self.textbuffer.handler_block(h_ids['insert-text']):
             with self.textbuffer.handler_block(h_ids['delete-range']):
                 self.apply_opcodes(opcodes)
@@ -86,7 +86,7 @@ class TextViewWindow(Gtk.Window):
                 
 
     def receive_snapshot(self, snapshot):
-        h_ids = self.collaborator_handlers
+        h_ids = self.majormajor_handlers
         with self.textbuffer.handler_block(h_ids['insert-text']):
             with self.textbuffer.handler_block(h_ids['delete-range']):
                 self.textbuffer.set_text(snapshot)
@@ -215,10 +215,10 @@ class TextViewWindow(Gtk.Window):
         print "saved"
     
     def on_random_clicked(self, widget):
-        self.collaborator.big_insert = not self.collaborator.big_insert
+        self.majormajor.big_insert = not self.majormajor.big_insert
     
     def on_button_clicked(self, widget, tag):
-        self.collaborator.big_insert = not self.collaborator.big_insert
+        self.majormajor.big_insert = not self.majormajor.big_insert
 
         bounds = self.textbuffer.get_selection_bounds()
         if len(bounds) != 0:
@@ -237,7 +237,7 @@ class TextViewWindow(Gtk.Window):
         self.textview.set_cursor_visible(widget.get_active())
 
     def on_wrap_toggled(self, widget, mode):
-        self.collaborator.big_insert = not self.collaborator.big_insert
+        self.majormajor.big_insert = not self.majormajor.big_insert
         self.textview.set_wrap_mode(mode)
 
     def on_justify_toggled(self, widget, justification):

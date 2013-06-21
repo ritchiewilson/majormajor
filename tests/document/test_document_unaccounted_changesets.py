@@ -1,5 +1,5 @@
-from collaborator.document import Document
-from collaborator.changeset import Changeset
+from majormajor.document import Document
+from majormajor.changeset import Changeset
 
 
 class TestDocumentUnaccountedChangesets:

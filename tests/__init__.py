@@ -1,2 +1,2 @@
 import sys
-sys.path.append("../collaborator")
+sys.path.append("../majormajor")

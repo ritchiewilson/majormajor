@@ -1,5 +1,5 @@
-from collaborator.document import Document
-from collaborator.op import Op
+from majormajor.document import Document
+from majormajor.op import Op
 
 
 class TestDocumentHelpers:

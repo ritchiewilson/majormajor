@@ -3,8 +3,8 @@ Testing operational transformation with each combination of
 possible opperations.
 """
 
-from collaborator.op import Op
-from collaborator.changeset import Changeset
+from majormajor.op import Op
+from majormajor.changeset import Changeset
 
 class TestOT:
 

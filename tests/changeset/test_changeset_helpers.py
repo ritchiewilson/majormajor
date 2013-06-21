@@ -1,8 +1,8 @@
 import pytest
 
-from collaborator.document import Document
-from collaborator.op import Op
-from collaborator.changeset import Changeset
+from majormajor.document import Document
+from majormajor.op import Op
+from majormajor.changeset import Changeset
 
 
 class TestChangesetHelpers:
