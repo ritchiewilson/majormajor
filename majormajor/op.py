@@ -27,7 +27,16 @@ class Op(object):
         self.t_path = path
         self.t_val = val
         self.t_offset = offset
+        self.noop = False
 
+    def get_path(self):
+        return self.path[:]
+
+    def get_transformed_path(self):
+        return self.t_path[:]
+
+    def is_noop(self):
+        return self.noop
 
     def to_jsonable(self):
         s = [{'action': self.action}, {'path': self.path}]
@@ -49,7 +58,8 @@ class Op(object):
         self.t_path = self.path
         self.t_val = self.val
         self.t_offset = self.offset
-
+        self.noop = False
+        
     def ot(self, pc):
         """
         pc: Changeset - previous changeset which has been applied but
@@ -60,6 +70,20 @@ class Op(object):
             func_name = self.json_opperations[op.action]
             func = getattr(self, func_name)
             func(op)
+
+    def set_transform(self, op):
+        """
+        Transfrom this opperation for a when a previously unknown
+        opperation was a "set" opperation.
+        """
+        if self.is_noop() or op.is_noop():
+            return
+            
+        # If the set opperation was in the path of this op, this
+        # becomes a noop. Otherwise fine
+        op_path = op.get_transformed_path()
+        if op_path == self.t_path[:len(op_path)]:
+            self.noop = True
 
     def string_insert_transform(self, op):
         """
@@ -81,7 +105,7 @@ class Op(object):
                 
 
     json_opperations = {
-        'set': 'set_value',
+        'set': 'set_transform',
         'bn' : 'boolean_negation',
         'na' : 'number_add',
         'si' : 'string_insert_transform',

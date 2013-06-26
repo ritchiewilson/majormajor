@@ -6,7 +6,7 @@ possible opperations.
 from majormajor.op import Op
 from majormajor.changeset import Changeset
 
-class TestOT:
+class TestOTStringInsertDelete:
 
     def test_si_si(self):
         op1 = Op('si', [], offset=3, val="ABC")
