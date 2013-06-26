@@ -176,7 +176,8 @@ class MajorMajor:
                'doc_id': doc.get_id(),
                'user': doc.get_user(),
                'snapshot': doc.get_snapshot(),
-               'deps': deps}
+               'deps': deps,
+               'root':doc.get_root_changeset().to_dict()}
         self.broadcast(msg)
 
     def receive_snapshot(self, m):

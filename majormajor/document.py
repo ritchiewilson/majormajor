@@ -237,6 +237,7 @@ class Document:
         m is the dict coming straight from another user over
         the tubes.
         """
+        self.root_changeset = build_changeset_from_dict(m['root'], self)
         deps = m['deps']
         new_css = []
         for dep in deps:
