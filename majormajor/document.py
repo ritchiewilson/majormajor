@@ -78,6 +78,9 @@ class Document:
         depend on the same changeset but do not know about each other.
         """
         return self.dependencies[:]
+
+    def clear_send_queue(self):
+        self.send_queue = []
         
     def get_missing_dependency_ids(self, new_cs):
         missing_dep_ids = []
@@ -186,7 +189,10 @@ class Document:
         Adds the changeset to this documents list of dependencies.
         """
 
-        if self.open_changeset == None or self.open_changeset.is_empty():
+        if self.open_changeset and self.open_changeset.is_empty():
+            self.open_changeset == None
+            
+        if self.open_changeset == None:
             return
 
         cs = self.open_changeset
