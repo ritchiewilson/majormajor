@@ -17,6 +17,7 @@
 
 from majormajor.document import Document
 from majormajor.op import Op
+from majormajor.changeset import Changeset
 
 
 class TestDocumentHelpers:
@@ -152,3 +153,34 @@ class TestDocumentHelpers:
         path10 = [5]
         assert doc2.get_value(path10) == None
 
+    def test_has_needed_dependencies(self):
+        doc = self.doc0
+
+        cs1 = Changeset(doc.get_id(), 'user', [doc.get_root_changeset()])
+        assert doc.has_needed_dependencies(cs1)
+
+        cs2 = Changeset(doc.get_id(), 'user', [cs1])
+        assert not doc.has_needed_dependencies(cs2)
+
+        doc.receive_changeset(cs1)
+        assert doc.has_needed_dependencies(cs2)
+
+        cs3 = Changeset(doc.get_id(), 'user', [cs1, cs2])
+        assert not doc.has_needed_dependencies(cs3)
+
+        doc.receive_changeset(cs2)
+        assert doc.has_needed_dependencies(cs3)
+
+        cs4 = Changeset(doc.get_id(), 'user', [cs3, "555"])
+        assert not doc.has_needed_dependencies(cs4)
+
+        doc.receive_changeset(cs3)
+        assert not doc.has_needed_dependencies(cs4)
+
+        cs5 = Changeset(doc.get_id(), 'user', [cs1])
+        cs5.set_id("555")
+        doc.receive_changeset(cs5)
+        cs4.relink_changesets(doc.all_known_changesets)
+        assert cs5 in cs4.get_parents()
+        assert cs4.has_full_dependency_info()
+        assert doc.has_needed_dependencies(cs4)

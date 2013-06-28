@@ -240,7 +240,7 @@ class Document:
                 self.dependencies.remove(parent)
         self.dependencies.append(cs)
         if len(cs.get_parents()) > 1:
-            print "HIP HIP"
+            print "needed OT", len(self.ordered_changesets)
         
         # randomly select if if this changeset should be a cache
         if random.random() < 0.01:
@@ -307,6 +307,8 @@ class Document:
         A peer has sent the changeset cs, so this determines if this
         client has all the need dependencies before it can be applied.
         """
+        if not cs.has_full_dependency_info():
+            return False
         deps = cs.get_parents()
         for dep in deps:
             if not dep.get_id() in self.all_known_changesets:

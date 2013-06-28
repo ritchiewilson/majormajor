@@ -114,7 +114,7 @@ class Changeset:
         return self._is_snapshot_cache and self.snapshot_cache_is_valid
 
     def get_ancestors(self):
-        if self.parents == []:
+        if self.parents == [] or not self.has_full_dependency_info():
             return set([])
         if self._is_ancestor_cache and self.ancestor_cache != None:
             return self.ancestor_cache
@@ -142,7 +142,7 @@ class Changeset:
         Determine if each dependency has all it's info, or if any of the
         dependencies are just an ID.
         """
-        for dep in self.dependencies:
+        for dep in self.parents:
             if not isinstance(dep, Changeset):
                 return False
         return True
