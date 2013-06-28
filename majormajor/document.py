@@ -218,6 +218,8 @@ class Document:
         """
         if not isinstance(cs, Changeset):
             cs = build_changeset_from_dict(cs['payload'], self)
+        if cs.get_id() in self.all_known_changesets:
+            return
         if not self.has_needed_dependencies(cs):
             self.pending_new_changesets.append(cs)
             dep_ids = self.get_missing_dependency_ids(cs)
@@ -287,6 +289,12 @@ class Document:
             cs.relink_changesets(self.all_known_changesets)
             
     def add_to_known_changesets(self, cs):
+        """
+        Add a changeset to the dict of all known changesets, then link it
+        up to its parents and children.
+        """
+        if cs.get_id() in self.all_known_changesets:
+            return
         self.all_known_changesets[cs.get_id()] = cs
         for p in cs.get_parents():
             if not isinstance(p, Changeset):

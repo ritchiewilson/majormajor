@@ -18,6 +18,7 @@
 from gi.repository import Gtk, Pango
 from majormajor import MajorMajor
 from op import Op
+import sys
 
 
 class TextViewWindow(Gtk.Window):
@@ -44,7 +45,12 @@ class TextViewWindow(Gtk.Window):
 
         
         self.majormajor = MajorMajor()
+        
+        listen_port = 8000 if len(sys.argv) < 2 else int(sys.argv[1])
+        self.majormajor.open_default_connection(listen_port)
         self.document = self.majormajor.new_document(snapshot='')
+        self.majormajor.announce()
+        
         self.majormajor.connect('remote-cursor-update', self.remote_cursor_update)
         self.majormajor.connect('receive-changeset', self.receive_changeset)
         self.majormajor.connect('receive-snapshot', self.receive_snapshot)

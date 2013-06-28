@@ -17,6 +17,7 @@
 
 from document import Document
 from changeset import Changeset
+from connection import Connection
 from op import Op
 import socket, copy, difflib
 import json
@@ -24,15 +25,7 @@ import sys
 import uuid
 import datetime
 
-from gi.repository import GObject, Gtk, GdkPixbuf
-
-
-HOST = '<broadcast>'
-PORT = 8000
-DEFAULT_COLLABORATOR_PORT = 8080
-if len(sys.argv) > 1:
-    PORT = int(sys.argv[1])
-    DEFAULT_COLLABORATOR_PORT = 8000
+from gi.repository import GObject
 
 
 class MajorMajor:
@@ -48,14 +41,8 @@ class MajorMajor:
         self.connections = []
         self.default_user = str(uuid.uuid4())
 
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        self.s.bind((HOST, PORT))
-        GObject.io_add_watch(self.s, GObject.IO_IN, self._listen_callback)
         GObject.timeout_add(20, self.test_thousands_ops)
         GObject.timeout_add(500, self.close_open_changesets)
-        self.announce()
         self.big_insert = False
 
 
@@ -83,7 +70,17 @@ class MajorMajor:
             for callback in self.signal_callbacks['receive-snapshot']:
                 callback(doc.get_snapshot())
         return True
-    
+
+    def open_default_connection(self, port):
+        """
+        Hard coded hack for testing purposes. Default connection is
+        sending json by broadcasting UDP over the local network.
+        """
+        from connections.UDP import UDPBroadcastConnection
+        c = UDPBroadcastConnection(callback=self._listen_callback, listen_port=port)
+        self.connections.append(c)
+        
+        
     def close_open_changesets(self):
         for doc in self.documents:
             for cs in doc.send_queue:
@@ -140,22 +137,19 @@ class MajorMajor:
                'doc_id':cs.get_doc_id()}
         self.broadcast(msg)
         
-    def _listen_callback(self, source, condition):
+    def _listen_callback(self, msg):
         """
         Whenever a socket is written to, this callback handles the
         message. If it is a bounceback from this user, just drop the
         message. Otherwise check the 'action' to figure out what to
         do.
         """
-        msg, (addr, port) = source.recvfrom(1024*4)
-        m = json.loads(msg)
-        for doc in self.documents:
-            if doc.get_user() == m['user']:
-                return
+
+        m = msg
 
         action = m['action']
         if action == 'announce':
-            self.receive_announce(m, addr, port)
+            self.receive_announce(m)
         if action == 'changeset':
             self.receive_changeset(m)
         if action == 'cursor':
@@ -175,8 +169,7 @@ class MajorMajor:
 
         return True
 
-    def receive_announce(self, m, addr, port):
-        self.add_connection(m, addr, port)
+    def receive_announce(self, m):
         self.invite_to_document(m['user'], self.documents[0].get_user(),
                                 self.documents[0].get_id())
 
@@ -244,8 +237,6 @@ class MajorMajor:
                'user': doc.get_user(),
                'history': [cs.to_dict() for cs in css]
                }
-        for cs in doc.get_ordered_changesets():
-            print cs.get_id()
         self.broadcast(msg)
 
     def receive_history(self, m):
@@ -333,27 +324,16 @@ class MajorMajor:
         
     def broadcast(self, msg):
         """
-        BIG FUCKING TODO: fix connecions clas to handle all this
-        """
-        ports = [DEFAULT_COLLABORATOR_PORT]
-        for c in self.connections:
-            if not c.port in ports: port.append(c.port)
-        for port in ports:
-            self.s.sendto(json.dumps(msg), (HOST, port))
+        msg is dict which contains all the information which should be
+        broadcast to peers. Each connection is responsible for
+        formatting the message how it wants and sending it out.
 
-    def add_connection(self, m, addr, port):
-        """
-        TODO: point this to connection objects
+        TODO: this will send out infor to eveyone, always. with better
+        connections types, need methods to send information to only
+        those who request it.
         """
         for c in self.connections:
-            if c.user == m['user']:
-                c.update(addr, port)
-                #c.send('known')
-                return
-
-        c = Connection(m['user'], addr, port)
-        self.connections.append(c)
-        c.send('learned');
+            c.send(msg)
         
     def connect(self, signal, callback):
         """
@@ -387,28 +367,3 @@ class MajorMajor:
         'accept-invitation': [],
         }
 
-    
-class Connection:
-    addr = None
-    port = None
-    cursor = {'stamp':0, 'path':[], 'offset':0}
-
-    def __init__(self, user, addr, port):
-        self.user = user
-        self.update(addr, port)
-
-    def send(self, msg):
-        self.s.send(msg)
-
-    def update(self, addr, port):
-        if self.addr != addr or self.port != port:
-            self.addr = addr
-            self.port = port
-            self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.s.connect((addr, port))
-
-    def _listen_callback(self, msg):
-        print msg
-
-    
