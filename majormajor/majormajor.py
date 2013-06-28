@@ -17,7 +17,6 @@
 
 from document import Document
 from changeset import Changeset
-from connection import Connection
 from op import Op
 import socket, copy, difflib
 import json
