@@ -118,7 +118,14 @@ class Document:
         return self.changesets
 
     def add_to_pending_new_changesets(self, cs):
+        """
+        Add the given changeset to the pending list, and add it's missing
+        dependencies to the missing changesets list.
+        """
         self.pending_new_changesets.append(cs)
+        dep_ids = self.get_missing_dependency_ids(cs)
+        self.missing_changesets += dep_ids
+
 
     def set_initial_snapshot(self, s):
         """
@@ -221,18 +228,12 @@ class Document:
         if cs.get_id() in self.all_known_changesets:
             return
         if not self.has_needed_dependencies(cs):
-            self.pending_new_changesets.append(cs)
-            dep_ids = self.get_missing_dependency_ids(cs)
-            self.missing_changesets += dep_ids
+            self.add_to_pending_new_changesets(cs)
             return False
 
         # close the currently open changeset and get it ready for sending
         current_cs = self.close_changeset()
         if current_cs:
-            # randomly select if if this changeset should be a cache
-            if random.random() < 0.01:
-                cs.set_as_snapshot_cache(True)
-                cs.set_snapshot_cache_is_valid(False)
             self.send_queue.append(current_cs)
 
         self.add_to_known_changesets(cs)
@@ -247,13 +248,9 @@ class Document:
             if parent in self.dependencies:
                 self.dependencies.remove(parent)
         self.dependencies.append(cs)
+
         if len(cs.get_parents()) > 1:
             print "needed OT", len(self.ordered_changesets)
-        
-        # randomly select if if this changeset should be a cache
-        if random.random() < 0.01:
-            cs.set_as_snapshot_cache(True)
-            cs.set_snapshot_cache_is_valid(False)
         
         return True
 

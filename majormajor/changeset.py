@@ -29,12 +29,11 @@ class Changeset:
         self.dependencies = dependencies
         self.children = []
         self.parents = dependencies[:]
-        self._is_snapshot_cache = False
-        self.snapshot_cache = None
+        self.set_as_snapshot_cache()
         self.set_dependencies(dependencies)
         self._is_ancestor_cache = False
         self.set_as_ancestor_cache()
-        
+
     def is_empty(self):
         return len(self.ops) == 0
     
@@ -84,8 +83,14 @@ class Changeset:
     def is_snapshot_cache(self):
         return self._is_snapshot_cache
 
-    def set_as_snapshot_cache(self, boolean):
+    def set_as_snapshot_cache(self, boolean=None):
+        # if not specified, this changeset should be randomly assigned
+        # to be a snapshot cache.
+        if boolean == None:
+            boolean = random.random() < 0.01
         self._is_snapshot_cache = boolean
+        if boolean:
+            self.snapshot_cache_is_valid = False
 
     def set_as_ancestor_cache(self, boolean=None):
         # if not specified, this changeset should be randomly assigned
@@ -107,7 +112,7 @@ class Changeset:
     def get_snapshot_cache(self):
         return self.snapshot_cache
 
-    def set_snapshot_cache_is_valid(self, boolean):
+    def set_snapshot_cache_is_valid(self, boolean=True):
         self.snapshot_cache_is_valid = boolean
 
     def has_valid_snapshot_cache(self):
