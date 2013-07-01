@@ -207,6 +207,12 @@ class Changeset:
 
     def relink_changesets(self, all_known_changesets):
         """
+        From the dictionary of all_known_changesets, relink this
+        changesets parents where able, and make this a child of it's
+        parents.
+
+        The given all_known_changesets is a dict, where keys are cs id
+        strings, and values are {'obj':<cs object>, 'active':boolean}
         """
         for parent in iter(self.parents):
             if not isinstance(parent, Changeset):
