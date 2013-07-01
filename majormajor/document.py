@@ -84,7 +84,7 @@ class Document:
         
     def get_missing_dependency_ids(self, new_cs):
         missing_dep_ids = []
-        for dep in new_cs.get_dependencies():
+        for dep in new_cs.get_parents():
             if not isinstance(dep, Changeset):
                 missing_dep_ids.append(dep)
         return missing_dep_ids
@@ -121,10 +121,13 @@ class Document:
         """
         Add the given changeset to the pending list, and add it's missing
         dependencies to the missing changesets list.
+
+        Returns the ids of the missing parent changesets.
         """
         self.pending_new_changesets.append(cs)
         dep_ids = self.get_missing_dependency_ids(cs)
         self.missing_changesets += dep_ids
+        return dep_ids
 
 
     def set_initial_snapshot(self, s):
@@ -225,18 +228,54 @@ class Document:
         """
         if not isinstance(cs, Changeset):
             cs = build_changeset_from_dict(cs['payload'], self)
-        if cs.get_id() in self.all_known_changesets:
-            return
-        if not self.has_needed_dependencies(cs):
-            self.add_to_pending_new_changesets(cs)
-            return False
 
+        if cs.get_id() in self.all_known_changesets:
+            return {'status':'known_changeset'}
+
+        self.add_to_known_changesets(cs)
+
+        # if this changeset cannot be used yet, add it to pending
+        # list, then return status with needed changeset ids
+        if not self.has_needed_dependencies(cs):
+            dep_ids = self.add_to_pending_new_changesets(cs)
+            return {'status':'missing_dependencies', \
+                    'dep_ids': dep_ids}
+
+        # from this point on, the changeset can be received, so start
+        # building the response status
+        response = {'status': 'success',
+                    'old_state': copy.deepcopy(self.get_snapshot()),
+                    'closed_changeset':False }
+        
         # close the currently open changeset and get it ready for sending
         current_cs = self.close_changeset()
         if current_cs:
             self.send_queue.append(current_cs)
+            response['closed_changeset'] = current_cs
 
-        self.add_to_known_changesets(cs)
+        self.activate_changeset_in_document(cs)
+        
+        if len(cs.get_parents()) > 1:
+            print "needed OT", len(self.ordered_changesets)
+
+        # if this changeset was previsously "missing", check the
+        # pending list for anything that can be inserted.
+        if cs.get_id() in self.missing_changesets:
+            self.missing_changesets.remove(cs.get_id())
+            self.pull_from_pending_list()            
+        
+        return response
+
+    def activate_changeset_in_document(self, cs):
+        """
+        Handles actually inserting the cs into the ordered changesets,
+        resetting changesets which must do OT, performing OT, and
+        reseting this document's dependency info.
+        
+        The given cs must a be one which 1) is not already in the ordered
+        changesets, 2) has all needed info to be inserted into ordered
+        changesets.
+        """
         i = self.insert_changeset_into_ordered_list(cs)
         self.update_unaccounted_changesets(cs)
         
@@ -249,11 +288,24 @@ class Document:
                 self.dependencies.remove(parent)
         self.dependencies.append(cs)
 
-        if len(cs.get_parents()) > 1:
-            print "needed OT", len(self.ordered_changesets)
         
-        return True
+    def pull_from_pending_list(self):
+        """
+        Go through the list of pending changesets and try again to
+        incorporatet them into this document. As long as the list of
+        pending changests shrinks, it loops through again.
 
+        TODO: This is so crazy inneficient. This'll blow up.
+        """
+        l = -1
+        while not l == len(self.pending_new_changesets):
+            l = len(self.pending_new_changesets)
+            for cs in iter(self.pending_new_changesets):
+                if self.has_needed_dependencies(cs):
+                    self.activate_changeset_in_document(cs)
+                    self.pending_new_changesets.remove(cs)
+
+        
     def receive_snapshot(self, m):
         """
         m is the dict coming straight from another user over
@@ -318,11 +370,12 @@ class Document:
         A peer has sent the changeset cs, so this determines if this
         client has all the need dependencies before it can be applied.
         """
+        cs.relink_changesets(self.all_known_changesets)
         if not cs.has_full_dependency_info():
             return False
         deps = cs.get_parents()
         for dep in deps:
-            if not dep.get_id() in self.all_known_changesets:
+            if not dep in self.ordered_changesets:
                 return False
         return True
 

@@ -350,14 +350,19 @@ class MajorMajor:
         if not doc:
             return
 
-        old_state = copy.deepcopy(doc.get_snapshot())
-        if not doc.receive_changeset(m):
+        response =  doc.receive_changeset(m)
+        status = response['status']
+        if status == 'known_changeset':
             return
-
-        opcodes = doc.get_diff_opcode(old_state)
-
+        elif status == 'missing_dependencies':
+            self.request_changesets(response['dep_ids'])
+            return
+            
+        # So the status was 'success'
+        opcodes = doc.get_diff_opcode(response['old_state'])
         for callback in self.signal_callbacks['receive-changeset']:
             callback(opcodes)
+            
 
     signal_callbacks = {
         'receive-changeset' : [],

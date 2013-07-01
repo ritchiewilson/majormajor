@@ -217,9 +217,22 @@ class Changeset:
                     self.parents.append(all_known_changesets[parent])
             else:
                 parent = parent.get_id()
-            all_known_changesets[parent].add_child(self)
+            if parent in all_known_changesets:
+                all_known_changesets[parent].add_child(self)
             i += 1
 
+    def relink_parent(self, cs):
+        """
+        Remove apropraite id string from parents list and replace it
+        with parent object.
+        """
+        for parent in iter(self.parents):
+            if cs.get_id() == parent:
+                self.parents.append(cs)
+                self.parents.remove(parent)
+                break
+
+    
     def get_dependency_chain(self):
         chain = set([])
         still_to_check_queue = self.get_dependencies_with_full_info()
