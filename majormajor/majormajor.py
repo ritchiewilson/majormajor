@@ -355,7 +355,7 @@ class MajorMajor:
         if status == 'known_changeset':
             return
         elif status == 'missing_dependencies':
-            self.request_changesets(response['dep_ids'])
+            self.request_changesets(doc.get_id(), response['dep_ids'])
             return
             
         # So the status was 'success'
