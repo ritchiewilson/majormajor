@@ -34,6 +34,7 @@ class TestDocumentMissingChangesets:
 
         # Just one Changeset gets put in pending list
         B = Changeset(doc.get_id(), "user1", ["C"])
+        B.set_id("B")
         doc.receive_changeset(B)
         assert doc.get_ordered_changesets() == [root, A]
         assert doc.missing_changesets == ["C"]
