@@ -208,9 +208,7 @@ class Changeset:
     def relink_changesets(self, all_known_changesets):
         """
         """
-        i = 0
-        while i < len(self.parents):
-            parent = self.parents[i]
+        for parent in iter(self.parents):
             if not isinstance(parent, Changeset):
                 if parent in all_known_changesets:
                     self.parents.remove(parent)
@@ -219,8 +217,8 @@ class Changeset:
                 parent = parent.get_id()
             if parent in all_known_changesets:
                 all_known_changesets[parent]['obj'].add_child(self)
-            i += 1
 
+                
     def relink_parent(self, cs):
         """
         Remove apropraite id string from parents list and replace it
