@@ -214,11 +214,11 @@ class Changeset:
             if not isinstance(parent, Changeset):
                 if parent in all_known_changesets:
                     self.parents.remove(parent)
-                    self.parents.append(all_known_changesets[parent])
+                    self.parents.append(all_known_changesets[parent]['obj'])
             else:
                 parent = parent.get_id()
             if parent in all_known_changesets:
-                all_known_changesets[parent].add_child(self)
+                all_known_changesets[parent]['obj'].add_child(self)
             i += 1
 
     def relink_parent(self, cs):

@@ -22,7 +22,7 @@ import uuid
 import copy
 from changeset import Changeset
 from op import Op
-from utils import build_changeset_from_dict
+from utils import build_changeset_from_dict, call_counter
 
 class Document:
 
@@ -91,7 +91,7 @@ class Document:
                 
     def get_changeset_by_id(self, cs_id):
         if cs_id in self.all_known_changesets:
-            return self.all_known_changesets[cs_id]
+            return self.all_known_changesets[cs_id]['obj']
         return None
 
     def get_open_changeset(self):
@@ -229,7 +229,7 @@ class Document:
         if not isinstance(cs, Changeset):
             cs = build_changeset_from_dict(cs['payload'], self)
 
-        if cs.get_id() in self.all_known_changesets:
+        if self.knows_changeset(cs.get_id()):
             return {'status':'known_changeset'}
 
         self.add_to_known_changesets(cs)
@@ -255,8 +255,8 @@ class Document:
 
         self.activate_changeset_in_document(cs)
         
-        if len(cs.get_parents()) > 1:
-            print "needed OT", len(self.ordered_changesets)
+        #if len(cs.get_parents()) > 1:
+            #print "needed OT", len(self.ordered_changesets)
 
         # if this changeset was previsously "missing", check the
         # pending list for anything that can be inserted.
@@ -335,16 +335,16 @@ class Document:
             
     def relink_changesets(self):
         for cs in self.all_known_changesets.values():
-            cs.relink_changesets(self.all_known_changesets)
+            cs['obj'].relink_changesets(self.all_known_changesets)
             
     def add_to_known_changesets(self, cs):
         """
         Add a changeset to the dict of all known changesets, then link it
         up to its parents and children.
         """
-        if cs.get_id() in self.all_known_changesets:
+        if self.knows_changeset(cs.get_id()):
             return
-        self.all_known_changesets[cs.get_id()] = cs
+        self.all_known_changesets[cs.get_id()] = {'obj': cs, 'active':False }
         for p in cs.get_parents():
             if not isinstance(p, Changeset):
                 p_obj = self.get_changeset_by_id(p)
@@ -364,7 +364,8 @@ class Document:
         while i < len(self.ordered_changesets):
             self.ordered_changesets[i].ot()
             i += 1
-        
+
+
     def has_needed_dependencies(self, cs):
         """
         A peer has sent the changeset cs, so this determines if this
