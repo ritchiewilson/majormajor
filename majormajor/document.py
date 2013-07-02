@@ -79,6 +79,9 @@ class Document:
         """
         return self.dependencies[:]
 
+    def get_missing_changeset_ids(self):
+        return self.missing_changesets[:]
+    
     def clear_send_queue(self):
         self.send_queue = []
         
@@ -229,6 +232,9 @@ class Document:
         if not isinstance(cs, Changeset):
             cs = build_changeset_from_dict(cs['payload'], self)
 
+        if cs.get_id() in self.missing_changesets:
+            self.missing_changesets.remove(cs.get_id())
+
         if self.knows_changeset(cs.get_id()):
             return {'status':'known_changeset'}
 
@@ -262,7 +268,7 @@ class Document:
         # pending list for anything that can be inserted.
         if cs.get_id() in self.missing_changesets:
             self.missing_changesets.remove(cs.get_id())
-            self.pull_from_pending_list()            
+        self.pull_from_pending_list()            
         
         return response
 

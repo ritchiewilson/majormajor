@@ -121,8 +121,11 @@ class TextViewWindow(Gtk.Window):
         button_save = Gtk.ToolButton.new_from_stock(Gtk.STOCK_SAVE)
         toolbar.insert(button_save, 0)
 
-        button_random = Gtk.ToolButton.new_from_stock(Gtk.STOCK_MEDIA_RECORD)
+        button_random = Gtk.ToggleToolButton(Gtk.STOCK_MEDIA_RECORD)
         toolbar.insert(button_random, 1)
+
+        button_drop_css = Gtk.ToggleToolButton(Gtk.STOCK_CANCEL)
+        toolbar.insert(button_drop_css, 2)
 
         #button_bold = Gtk.ToolButton.new_from_stock(Gtk.STOCK_BOLD)
         #toolbar.insert(button_bold, 0)
@@ -130,14 +133,15 @@ class TextViewWindow(Gtk.Window):
         #button_italic = Gtk.ToolButton.new_from_stock(Gtk.STOCK_ITALIC)
         #toolbar.insert(button_italic, 1)
 
-        button_underline = Gtk.ToolButton.new_from_stock(Gtk.STOCK_UNDERLINE)
-        toolbar.insert(button_underline, 2)
+        #button_underline = Gtk.ToolButton.new_from_stock(Gtk.STOCK_UNDERLINE)
+        #toolbar.insert(button_underline, 2)
         
         button_save.connect("clicked", self.on_save_clicked)
         button_random.connect("clicked", self.on_random_clicked)
+        button_drop_css.connect("clicked", self.on_drop_css_clicked)
         #button_bold.connect("clicked", self.on_button_clicked, self.tag_bold)
         #button_italic.connect("clicked", self.on_button_clicked, self.tag_italic)
-        button_underline.connect("clicked", self.on_button_clicked, self.tag_underline)
+        #button_underline.connect("clicked", self.on_button_clicked, self.tag_underline)
 
         toolbar.insert(Gtk.SeparatorToolItem(), 3)
 
@@ -233,13 +237,22 @@ class TextViewWindow(Gtk.Window):
         f = open(n, 'w')
         start = self.textbuffer.get_start_iter()
         end = self.textbuffer.get_end_iter()
-        f.write(self.textbuffer.get_text(start, end,True))
+        #f.write(self.textbuffer.get_text(start, end,True))
+        ol = self.document.get_ordered_changesets()
+        for cs in ol:
+            f.write(cs.get_id() + "\n")
+            for ucs in cs.get_unaccounted_changesets():
+                f.write("    " + ucs.get_id() + "\n")
         f.close()
         print "saved"
     
     def on_random_clicked(self, widget):
         self.majormajor.big_insert = not self.majormajor.big_insert
-    
+
+    def on_drop_css_clicked(self, widget):
+        b = self.majormajor.drop_random_css
+        self.majormajor.drop_random_css = not b
+        
     def on_button_clicked(self, widget, tag):
         self.majormajor.big_insert = not self.majormajor.big_insert
 

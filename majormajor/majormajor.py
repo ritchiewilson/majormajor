@@ -23,6 +23,7 @@ import json
 import sys
 import uuid
 import datetime
+import random
 
 from gi.repository import GObject
 
@@ -39,16 +40,18 @@ class MajorMajor:
         self.documents = []
         self.connections = []
         self.default_user = str(uuid.uuid4())
+        self.requested_changesets = {}
 
         GObject.timeout_add(20, self.test_thousands_ops)
         GObject.timeout_add(500, self.close_open_changesets)
+        GObject.timeout_add(2000, self._retry_request_changesets)
         self.big_insert = False
-
+        self.drop_random_css = False
 
     def test_thousands_ops(self):
         if self.big_insert:
             doc = self.documents[0]
-            import random, string
+            import string
             n = random.randint(1,5)
             o = random.randint(0, len(doc.get_snapshot()))
             if random.random() > .3 or len(doc.get_snapshot()) == 0:
@@ -164,8 +167,31 @@ class MajorMajor:
         if action == 'send_history':
             self.receive_history(m)
         if action == 'request_changesets':
-            self.send_changesets(m)
+            self.send_changesets(m, True)
 
+        return True
+
+    def _retry_request_changesets(self):
+        print "ALL KNOWN", len(self.documents[0].all_known_changesets)
+        print "IN ORDER ", len(self.documents[0].ordered_changesets)
+        for doc_id, css in self.requested_changesets.items():
+            doc = self.get_document_by_id(doc_id)
+            missing_changesets = doc.get_missing_changeset_ids()
+            request_list = []
+            doc_dict = self.requested_changesets[doc_id]
+            for cs_id, count in css.items():
+                if not cs_id in missing_changesets:
+                    del doc_dict[cs_id]
+                elif count['countdown'] == 0:
+                    request_list.append(cs_id)
+                    doc_dict[cs_id]['countdown'] = count['next_start']
+                    doc_dict[cs_id]['next_start'] = count['next_start'] * 2
+                else:
+                    doc_dict[cs_id]['countdown'] -= 1
+            if len(request_list) > 0:
+                print "requesting", len(request_list)
+                self.request_changesets(doc_id, request_list)
+                    
         return True
 
     def receive_announce(self, m):
@@ -307,19 +333,24 @@ class MajorMajor:
         self.broadcast(msg)
 
     def request_changesets(self, doc_id, cs_ids):
+        if len(cs_ids) == 0:
+            return
         msg = {"action":"request_changesets",
                "user":self.default_user,
                "doc_id":doc_id,
                'cs_ids':cs_ids}
         self.broadcast(msg)
 
-    def send_changesets(self, m):
+    def send_changesets(self, m, debug=False):
         doc = self.get_document_by_id(m['doc_id'])
         if not doc:
             return
         for cs_id in m['cs_ids']:
+            if debug:
+                print cs_id
             cs = doc.get_changeset_by_id(cs_id)
             self.send_changeset(cs)
+
         
     def broadcast(self, msg):
         """
@@ -346,6 +377,11 @@ class MajorMajor:
         Handler for recieving changest messages from remote
         collaborators.
         """
+        # For testing. If this flag is set, drop changesets at random
+        # to simulate network problems.
+        if self.drop_random_css and random.random() < 0.1:
+            return
+
         doc = self.get_document_by_id(m['doc_id'])
         if not doc:
             return
@@ -355,7 +391,10 @@ class MajorMajor:
         if status == 'known_changeset':
             return
         elif status == 'missing_dependencies':
-            self.request_changesets(doc.get_id(), response['dep_ids'])
+            dep_ids = response['dep_ids']
+            if dep_ids:
+                self.add_to_requested_changesets(doc.get_id(), dep_ids)
+                self.request_changesets(doc.get_id(), dep_ids)
             return
             
         # So the status was 'success'
@@ -363,7 +402,13 @@ class MajorMajor:
         for callback in self.signal_callbacks['receive-changeset']:
             callback(opcodes)
             
-
+    def add_to_requested_changesets(self, doc_id, dep_ids):
+        if not doc_id in self.requested_changesets:
+            self.requested_changesets[doc_id] = {}
+        for dep_id in dep_ids:
+            if not dep_id in self.requested_changesets[doc_id]:
+                self.requested_changesets[doc_id][dep_id] = {'countdown':0, \
+                                                             'next_start': 1}
     signal_callbacks = {
         'receive-changeset' : [],
         'receive-snapshot' : [],
@@ -371,3 +416,19 @@ class MajorMajor:
         'accept-invitation': [],
         }
 
+    
+class RequestChangesetCounter:
+    def __init__(self, doc, cs_id):
+        self.doc = doc
+        self.cs_id = cs_id
+        self.countdown = 0
+        self.next_start = 1
+
+    def time_for_new_request(self):
+        if self.countdown == 0:
+            self.countdown = self.next_start
+            self.next_start = min(self.next_start*2, 15)
+            return True
+        else:
+            self.countdown -= 1
+            return False
