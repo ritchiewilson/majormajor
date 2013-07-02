@@ -23,13 +23,13 @@ class TestDocumentMissingChangesets:
 
     def test_missing_changesets(self):
         doc = Document(snapshot='')
-        assert doc.missing_changesets == []
+        assert doc.missing_changesets == set([])
         assert doc.pending_new_changesets == []
         
         root = doc.get_root_changeset()
         A = Changeset(doc.get_id(), "dummyuser", [root])
         doc.receive_changeset(A)
-        assert doc.missing_changesets == []
+        assert doc.missing_changesets == set([])
         assert doc.pending_new_changesets == []
 
         # Just one Changeset gets put in pending list
@@ -37,13 +37,13 @@ class TestDocumentMissingChangesets:
         B.set_id("B")
         doc.receive_changeset(B)
         assert doc.get_ordered_changesets() == [root, A]
-        assert doc.missing_changesets == ["C"]
+        assert doc.missing_changesets == set(["C"])
         assert doc.pending_new_changesets == [B]
 
         C = Changeset(doc.get_id(), "user1", [A])
         C.set_id("C")
         doc.receive_changeset(C)
-        assert doc.missing_changesets == []
+        assert doc.missing_changesets == set([])
         assert doc.pending_new_changesets == []
         assert B.get_parents() == [C]
         assert doc.get_ordered_changesets() == [root, A, C, B]
@@ -52,7 +52,7 @@ class TestDocumentMissingChangesets:
         D = Changeset(doc.get_id(), "user1", ["G"])
         D.set_id("D")
         doc.receive_changeset(D)
-        assert doc.missing_changesets == ["G"]
+        assert doc.missing_changesets == set(["G"])
         assert doc.pending_new_changesets == [D]
         assert doc.get_ordered_changesets() == [root, A, C, B]
 
@@ -60,21 +60,21 @@ class TestDocumentMissingChangesets:
         E.set_id("E")
         doc.receive_changeset(E)
         assert E.get_parents() == [D]
-        assert doc.missing_changesets == ["G"]
+        assert doc.missing_changesets == set(["G"])
         assert doc.pending_new_changesets == [D, E]
         assert doc.get_ordered_changesets() == [root, A, C, B]
 
         F = Changeset(doc.get_id(), "user1", ["E"])
         F.set_id("F")
         doc.receive_changeset(F)
-        assert doc.missing_changesets == ["G"]
+        assert doc.missing_changesets ==set( ["G"])
         assert doc.pending_new_changesets == [D, E, F]
         assert doc.get_ordered_changesets() == [root, A, C, B]
 
         G = Changeset(doc.get_id(), "user1", ["C"])
         G.set_id("G")
         doc.receive_changeset(G)
-        assert doc.missing_changesets == []
+        assert doc.missing_changesets == set([])
         assert doc.pending_new_changesets == []
         assert doc.get_ordered_changesets() == [root, A, C, B, G, D, E, F]
         assert doc.get_ordered_changesets() == doc.tree_to_list()

@@ -41,7 +41,7 @@ class Document:
         #self.changesets = []
         self.ordered_changesets = []
         self.all_known_changesets = {}
-        self.missing_changesets = []
+        self.missing_changesets = set([])
         self.send_queue = []
         self.pending_new_changesets = []
         self.pending_historical_changesets = []
@@ -80,7 +80,7 @@ class Document:
         return self.dependencies[:]
 
     def get_missing_changeset_ids(self):
-        return self.missing_changesets[:]
+        return self.missing_changesets.copy()
     
     def clear_send_queue(self):
         self.send_queue = []
@@ -129,7 +129,7 @@ class Document:
         """
         self.pending_new_changesets.append(cs)
         dep_ids = self.get_missing_dependency_ids(cs)
-        self.missing_changesets += dep_ids
+        self.missing_changesets.update(dep_ids)
         return dep_ids
 
 
@@ -264,10 +264,7 @@ class Document:
         #if len(cs.get_parents()) > 1:
             #print "needed OT", len(self.ordered_changesets)
 
-        # if this changeset was previsously "missing", check the
-        # pending list for anything that can be inserted.
-        if cs.get_id() in self.missing_changesets:
-            self.missing_changesets.remove(cs.get_id())
+        # check the pending list for anything that can be inserted.
         self.pull_from_pending_list()            
         
         return response
