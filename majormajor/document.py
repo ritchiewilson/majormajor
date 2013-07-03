@@ -40,6 +40,7 @@ class Document:
         # some initial values
         #self.changesets = []
         self.ordered_changesets = []
+        self.ordered_changesets_set_cache = set([])
         self.all_known_changesets = {}
         self.missing_changesets = set([])
         self.send_queue = []
@@ -144,6 +145,7 @@ class Document:
         cs = self.close_changeset()
         self.root_changeset = cs
         self.ordered_changesets = [cs]
+        self.ordered_changesets_set_cache = set([cs])
         
 
     def set_snapshot(self, snapshot, deps):
@@ -211,6 +213,7 @@ class Document:
         cs = self.open_changeset
         self.add_to_known_changesets(cs)
         self.ordered_changesets.append(cs)
+        self.ordered_changesets_set_cache.update([cs])
         self.open_changeset = None
         cs.set_unaccounted_changesets([])
         # clean out old dependencies, since this should be the only
@@ -337,6 +340,7 @@ class Document:
             self.add_to_known_changesets(hcs)
         self.relink_changesets()
         self.ordered_changesets = self.tree_to_list()
+        self.ordered_changesets_set_cache = set(self.ordered_changesets)
         prev = []
         for cs in self.ordered_changesets:
             cs.find_unaccounted_changesets(prev)
@@ -385,7 +389,7 @@ class Document:
             return False
         deps = cs.get_parents()
         for dep in deps:
-            if not dep in self.ordered_changesets:
+            if not dep in self.ordered_changesets_set_cache:
                 return False
         return True
 
@@ -443,7 +447,7 @@ class Document:
         i = pos_of_cs + 1
         while i < len(self.ordered_changesets):
             future_cs = self.ordered_changesets[i]
-            future_cs.add_to_unaccounted_changesets(cs,pos_of_cs, self)
+            future_cs.add_to_unaccounted_changesets(cs,pos_of_cs, self.ordered_changesets)
             i += 1
         
     def insert_changeset_into_ordered_list(self, cs):
@@ -455,6 +459,7 @@ class Document:
 
         i = self.get_insertion_point_into_ordered_changesets(cs)
         self.ordered_changesets.insert(i, cs)
+        self.ordered_changesets_set_cache.update([cs])
         return i
 
     def get_insertion_point_into_ordered_changesets(self, cs, ordered_list=None):

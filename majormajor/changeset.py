@@ -29,6 +29,7 @@ class Changeset:
         self.dependencies = dependencies
         self.children = []
         self.parents = dependencies[:]
+        self._has_full_dependency_info = False
         self.set_as_snapshot_cache()
         self.set_dependencies(dependencies)
         self._is_ancestor_cache = False
@@ -100,7 +101,7 @@ class Changeset:
         # cache
         if boolean == None:
             x = random.random()
-            boolean = x < 0.6 if len(self.get_parents()) > 1 else x < 0.07
+            boolean = True if len(self.get_parents()) > 1 else x < 0.1
         self._is_ancestor_cache = boolean
         if boolean:
             self._has_valid_ancestor_cache = False
@@ -159,9 +160,12 @@ class Changeset:
         Determine if each dependency has all it's info, or if any of the
         dependencies are just an ID.
         """
+        if self._has_full_dependency_info:
+            return True
         for dep in self.parents:
             if not isinstance(dep, Changeset):
                 return False
+        self._has_full_dependency_info = True
         return True
 
     def get_dependency_ids(self):
@@ -276,15 +280,15 @@ class Changeset:
             raise Exception("Preceding Changesets not yet known")
         return self.preceding_changesets[:]
 
-    def add_to_unaccounted_changesets(self, cs, index, doc):
-        ordered_changesets = doc.get_ordered_changesets()
+    def add_to_unaccounted_changesets(self, cs, index, ordered_changesets):
         i = index
         insertion_point = 0
+        preceding_css = set(self.preceding_changesets)
         while i < len(ordered_changesets):
             if ordered_changesets[i] == self:
                 insertion_point = len(self.get_unaccounted_changesets())
                 break
-            if ordered_changesets[i] in self.preceding_changesets:
+            if ordered_changesets[i] in preceding_css:
                 insertion_point = self.preceding_changesets.index(ordered_changesets[i])
                 break
             i += 1
