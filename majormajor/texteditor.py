@@ -237,15 +237,22 @@ class TextViewWindow(Gtk.Window):
         f = open(n, 'w')
         start = self.textbuffer.get_start_iter()
         end = self.textbuffer.get_end_iter()
-        #f.write(self.textbuffer.get_text(start, end,True))
+        f.write(self.textbuffer.get_text(start, end,True))
         ol = self.document.get_ordered_changesets()
         for cs in ol:
-            f.write(cs.get_id() + "\n")
+            f.write(cs.get_id()[:8])
+            #if cs.user == self.majormajor.default_user:
+            #    f.write("  <---- local")
+            f.write("\n")
             for ucs in cs.get_unaccounted_changesets():
-                f.write("    " + ucs.get_id() + "\n")
+                f.write("    " + ucs.get_id()[:8])
+                #if ucs.user == self.majormajor.default_user:
+                #    f.write("  <---- local")
+                f.write("\n")
         f.close()
         print "saved"
-    
+
+
     def on_random_clicked(self, widget):
         self.majormajor.big_insert = not self.majormajor.big_insert
 

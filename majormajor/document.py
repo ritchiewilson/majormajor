@@ -279,6 +279,12 @@ class Document:
         changesets, 2) has all needed info to be inserted into ordered
         changesets.
         """
+
+        # this is the first time a changeset's ancestors can be
+        # accuratly determined, so cache it if need be.
+        if cs._is_ancestor_cache:
+            cs.get_ancestors()
+        
         i = self.insert_changeset_into_ordered_list(cs)
         self.update_unaccounted_changesets(cs)
         

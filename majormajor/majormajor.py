@@ -172,8 +172,6 @@ class MajorMajor:
         return True
 
     def _retry_request_changesets(self):
-        print "ALL KNOWN", len(self.documents[0].all_known_changesets)
-        print "IN ORDER ", len(self.documents[0].ordered_changesets)
         for doc_id, css in self.requested_changesets.items():
             doc = self.get_document_by_id(doc_id)
             missing_changesets = doc.get_missing_changeset_ids()
@@ -379,7 +377,7 @@ class MajorMajor:
         """
         # For testing. If this flag is set, drop changesets at random
         # to simulate network problems.
-        if self.drop_random_css and random.random() < 0.1:
+        if self.drop_random_css and random.random() < 0.5:
             return
 
         doc = self.get_document_by_id(m['doc_id'])

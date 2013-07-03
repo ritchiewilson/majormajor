@@ -103,8 +103,8 @@ class Changeset:
             boolean = x < 0.6 if len(self.get_parents()) > 1 else x < 0.07
         self._is_ancestor_cache = boolean
         if boolean:
+            self._has_valid_ancestor_cache = False
             self.ancestor_cache = None
-            self.ancestor_cache = self.get_ancestors()
         
     def set_snapshot_cache(self, snapshot):
         self.snapshot_cache = snapshot
@@ -119,14 +119,26 @@ class Changeset:
         return self._is_snapshot_cache and self.snapshot_cache_is_valid
 
     def get_ancestors(self):
-        if self.parents == [] or not self.has_full_dependency_info():
-            return set([])
-        if self._is_ancestor_cache and self.ancestor_cache != None:
-            return self.ancestor_cache
+        """
+        Recursively go through all parents to the document root to return
+        a set of all ancestors. If this changeset is an ancestor cache,
+        the set is saved.
+        """
+        if not self.has_full_dependency_info():
+            raise Exception("Cannot get ancestor list without full dependency info.")
+
+        # just return the cache if able
+        if self._is_ancestor_cache and self._has_valid_ancestor_cache:
+            return self.ancestor_cache.copy()
+
+        # otherwise, recursively find all ancestors
         ancestors = set(self.parents)
         for parent in self.parents:
             ancestors.update(parent.get_ancestors())
+
+        # make sure this list is full and accurate before cacheing it
         if self._is_ancestor_cache:
+            self._has_valid_ancestor_cache = True
             self.ancestor_cache = ancestors
         return ancestors
         
