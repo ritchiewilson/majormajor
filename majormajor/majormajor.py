@@ -31,7 +31,7 @@ from gi.repository import GObject
 class MajorMajor:
     # TODO: user authentication
 
-    def __init__(self):
+    def __init__(self, event_loop=True):
         """
         On creation, create a socket to listen to UDP broadcasts on a
         default port.
@@ -41,16 +41,20 @@ class MajorMajor:
         self.connections = []
         self.default_user = str(uuid.uuid4())
         self.requested_changesets = {}
-
-        GObject.timeout_add(20, self.test_thousands_ops)
-        GObject.timeout_add(500, self.close_open_changesets)
-        GObject.timeout_add(2000, self._retry_request_changesets)
+        
+        self.event_loop = event_loop
+        if event_loop:
+            GObject.timeout_add(20, self.test_thousands_ops)
+            GObject.timeout_add(500, self.close_open_changesets)
+            GObject.timeout_add(2000, self._retry_request_changesets)
+            GObject.timeout_add(10000, self._check_sync_status)
         self.big_insert = False
         self.drop_random_css = False
 
     def test_thousands_ops(self):
         if self.big_insert:
             doc = self.documents[0]
+            old_state = doc.get_snapshot()
             import string
             n = random.randint(1,5)
             o = random.randint(0, len(doc.get_snapshot()))
@@ -69,8 +73,10 @@ class MajorMajor:
                 
             cs = doc.close_changeset()
             self.send_changeset(cs)
-            for callback in self.signal_callbacks['receive-snapshot']:
-                callback(doc.get_snapshot())
+            # So the status was 'success'
+            opcodes = doc.get_diff_opcode(old_state)
+            for callback in self.signal_callbacks['receive-changeset']:
+                callback(opcodes)
         return True
 
     def open_default_connection(self, port):
@@ -138,6 +144,7 @@ class MajorMajor:
                'user':cs.get_user(),
                'doc_id':cs.get_doc_id()}
         self.broadcast(msg)
+        return msg
         
     def _listen_callback(self, msg):
         """
@@ -149,29 +156,37 @@ class MajorMajor:
 
         m = msg
 
+        return_msg = {}
+
+        if not 'action' in msg:
+            return return_msg
+            
         action = m['action']
         if action == 'announce':
-            self.receive_announce(m)
+            return_msg = self.receive_announce(m)
         if action == 'changeset':
-            self.receive_changeset(m)
+            return_msg = self.receive_changeset(m)
         if action == 'cursor':
-            self.update_cursor(m)
+            return_msg = self.update_cursor(m)
         if action == 'invite_to_document':
-            self.accept_invitation_to_document(m)
+            return_msg = self.accept_invitation_to_document(m)
         if action == 'request_snapshot':
-            self.send_snapshot(m)
+            return_msg = self.send_snapshot(m)
         if action == 'send_snapshot':
-            self.receive_snapshot(m)
+            return_msg = self.receive_snapshot(m)
         if action == 'request_history':
-            self.send_history(m)
+            return_msg = self.send_history(m)
         if action == 'send_history':
-            self.receive_history(m)
+            return_msg = self.receive_history(m)
         if action == 'request_changesets':
-            self.send_changesets(m, True)
+            return_msg = self.send_changesets(m, True)
+        if action == 'sync_request':
+            return_msg = self.sync_response(m)
 
-        return True
+        return return_msg
 
     def _retry_request_changesets(self):
+        msg = {}
         for doc_id, css in self.requested_changesets.items():
             doc = self.get_document_by_id(doc_id)
             missing_changesets = doc.get_missing_changeset_ids()
@@ -186,15 +201,41 @@ class MajorMajor:
                     doc_dict[cs_id]['next_start'] = count['next_start'] * 2
                 else:
                     doc_dict[cs_id]['countdown'] -= 1
-            if len(request_list) > 0:
-                print "requesting", len(request_list)
-                self.request_changesets(doc_id, request_list)
-                    
-        return True
+            msg = self.request_changesets(doc_id, request_list)
+        if self.event_loop:
+            return True
+        return msg
 
+    def _check_sync_status(self):
+        doc = self.documents[0]
+        deps = [dep.get_id() for dep in doc.get_dependencies()]
+        msg = {'action': 'sync_request',
+               'doc_id': doc.get_id(),
+               'user': doc.get_user(),
+               'deps': deps}
+        self.broadcast(msg)
+        return msg
+
+    def sync_response(self, m):
+        doc = self.get_document_by_id(m['doc_id'])
+        if not doc:
+            return
+        action, css = doc.get_sync_status(m['deps'])
+        msg = 'in-sync'
+        if action == 'request':
+            print 'syncing.....'
+            msg = self.request_changesets(m['doc_id'], css)
+        elif action == 'send':
+            print 'syncing.....'
+            msg = self.send_changesets(m['doc_id'], css)
+        else:
+            print 'in-sync'
+        return msg
+            
     def receive_announce(self, m):
-        self.invite_to_document(m['user'], self.documents[0].get_user(),
+        msg = self.invite_to_document(m['user'], self.documents[0].get_user(),
                                 self.documents[0].get_id())
+        return msg
 
         
     def send_snapshot(self, m):
@@ -213,6 +254,7 @@ class MajorMajor:
                'deps': deps,
                'root':doc.get_root_changeset().to_dict()}
         self.broadcast(msg)
+        return msg
 
     def receive_snapshot(self, m):
         """
@@ -224,10 +266,13 @@ class MajorMajor:
         last_known_deps = []
         doc.receive_snapshot(m)
         new_css = doc.get_dependencies()
+        msg = {}
         if new_css:
-            self.request_history(doc, new_css, last_known_deps)
+            msg = self.request_history(doc, new_css, last_known_deps)
         for callback in self.signal_callbacks['receive-snapshot']:
             callback(doc.get_snapshot())
+
+        return msg
 
     def request_history(self, doc, new_css, last_known_css):
         """
@@ -245,6 +290,7 @@ class MajorMajor:
                'last_known_cs_ids': [cs.get_id() for cs in last_known_css]
                }
         self.broadcast(msg)
+        return msg
 
     def send_history(self, m):
         """
@@ -261,6 +307,7 @@ class MajorMajor:
                'history': [cs.to_dict() for cs in css]
                }
         self.broadcast(msg)
+        return msg
 
     def receive_history(self, m):
         """
@@ -283,10 +330,11 @@ class MajorMajor:
         doc = self.new_document(m['doc_id'])
         # TODO hardcoding this for testing
         self.documents = [doc]
-        self.request_snapshot(m['doc_id'])
+        msg = self.request_snapshot(m['doc_id'])
         for callback in self.signal_callbacks['accept-invitation']:
             callback(doc)
-    
+        return msg
+        
     def request_snapshot(self, doc_id):
         """
         Request a document snapshot from a user.
@@ -296,6 +344,7 @@ class MajorMajor:
                'user': doc.get_user(),
                'doc_id': doc_id}
         self.broadcast(msg)
+        return msg
 
         
     def update_cursor(self, msg):
@@ -317,6 +366,7 @@ class MajorMajor:
         msg = {'action':'announce',
                'user':self.default_user}
         self.broadcast(msg)
+        return msg
 
     def invite_to_document(self, to_user, from_user, doc_id):
         """
@@ -329,26 +379,28 @@ class MajorMajor:
                "user":from_user,
                "doc_id":doc_id}
         self.broadcast(msg)
+        return msg
 
     def request_changesets(self, doc_id, cs_ids):
         if len(cs_ids) == 0:
-            return
+            return {}
         msg = {"action":"request_changesets",
                "user":self.default_user,
                "doc_id":doc_id,
                'cs_ids':cs_ids}
         self.broadcast(msg)
+        return msg
 
     def send_changesets(self, m, debug=False):
+        msg = {}
         doc = self.get_document_by_id(m['doc_id'])
         if not doc:
             return
         for cs_id in m['cs_ids']:
-            if debug:
-                print cs_id
             cs = doc.get_changeset_by_id(cs_id)
-            self.send_changeset(cs)
-
+            if cs:
+                msg = self.send_changeset(cs)
+        return msg
         
     def broadcast(self, msg):
         """
@@ -378,7 +430,7 @@ class MajorMajor:
         # For testing. If this flag is set, drop changesets at random
         # to simulate network problems.
         if self.drop_random_css and random.random() < 0.5:
-            return
+            return 'fail'
 
         doc = self.get_document_by_id(m['doc_id'])
         if not doc:
@@ -387,18 +439,19 @@ class MajorMajor:
         response =  doc.receive_changeset(m)
         status = response['status']
         if status == 'known_changeset':
-            return
+            return status
         elif status == 'missing_dependencies':
             dep_ids = response['dep_ids']
             if dep_ids:
                 self.add_to_requested_changesets(doc.get_id(), dep_ids)
                 self.request_changesets(doc.get_id(), dep_ids)
-            return
+            return status
             
         # So the status was 'success'
         opcodes = doc.get_diff_opcode(response['old_state'])
         for callback in self.signal_callbacks['receive-changeset']:
             callback(opcodes)
+        return status
             
     def add_to_requested_changesets(self, doc_id, dep_ids):
         if not doc_id in self.requested_changesets:

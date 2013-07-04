@@ -121,6 +121,16 @@ class Document:
     def get_changesets(self):
         return self.changesets
 
+    def get_sync_status(self, deps):
+        local_dep_ids = [dep.get_id() for dep in self.dependencies]
+        css = [dep for dep in deps if dep not in  local_dep_ids]
+        if css:
+            return 'request', css
+        css = [dep for dep in deps if not self.knows_changeset(dep)]
+        if css:
+            return 'send', css
+        return 'synced', []
+
     def add_to_pending_new_changesets(self, cs):
         """
         Add the given changeset to the pending list, and add it's missing
@@ -235,13 +245,13 @@ class Document:
         if not isinstance(cs, Changeset):
             cs = build_changeset_from_dict(cs['payload'], self)
 
-        if cs.get_id() in self.missing_changesets:
-            self.missing_changesets.remove(cs.get_id())
-
         if self.knows_changeset(cs.get_id()):
             return {'status':'known_changeset'}
 
         self.add_to_known_changesets(cs)
+
+        if cs.get_id() in self.missing_changesets:
+            self.missing_changesets.remove(cs.get_id())
 
         # if this changeset cannot be used yet, add it to pending
         # list, then return status with needed changeset ids
@@ -327,8 +337,15 @@ class Document:
         deps = m['deps']
         new_css = []
         for dep in deps:
-            new_css.append(build_changeset_from_dict(dep, self))
+            new_cs = build_changeset_from_dict(dep, self)
+            if new_cs.get_id() == self.root_changeset.get_id():
+                new_cs = self.root_changeset
+            new_css.append(new_cs)
+            
         self.set_snapshot(m['snapshot'], new_css)
+        if [self.root_changeset] == self.dependencies:
+            self.ordered_changesets = [self.root_changeset]
+            self.ordered_changesets_set_cache = set([self.root_changeset])
 
 
     def receive_history(self, m):
@@ -373,7 +390,7 @@ class Document:
         Perform opperational transformation on all changesets from
         start onwards.
         """
-        i = start
+        i = max(start, 1)
         while i < len(self.ordered_changesets):
             self.ordered_changesets[i].ot()
             i += 1
