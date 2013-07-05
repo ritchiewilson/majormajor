@@ -243,7 +243,7 @@ class Document:
         it into place and rebuild state with that addition.
         """
         if not isinstance(cs, Changeset):
-            cs = build_changeset_from_dict(cs['payload'], self)
+            cs = build_changeset_from_dict(cs, self)
 
         if self.knows_changeset(cs.get_id()):
             return {'status':'known_changeset'}

@@ -139,7 +139,7 @@ class MajorMajor:
         Build the message object to send to other collaborators.
         """
         msg = {'action':'changeset',
-               'payload':cs.to_dict(),
+               'cs':cs.to_dict(),
                'cs_id': cs.get_id(),
                'user':cs.get_user(),
                'doc_id':cs.get_doc_id()}
@@ -436,7 +436,7 @@ class MajorMajor:
         if not doc:
             return
 
-        response =  doc.receive_changeset(m)
+        response =  doc.receive_changeset(m['cs'])
         status = response['status']
         if status == 'known_changeset':
             return status
