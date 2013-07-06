@@ -31,33 +31,12 @@ class Changeset:
         self.parents = dependencies[:]
         self._has_full_dependency_info = False
         self.set_as_snapshot_cache()
-        self.set_dependencies(dependencies)
         self._is_ancestor_cache = False
         self.set_as_ancestor_cache()
 
     def is_empty(self):
         return len(self.ops) == 0
     
-    def set_dependencies(self, deps):
-        """
-        Split dependencies into two lists. One which holds dependencies
-        when the full cs object is known. The other is where we put
-        dependencies for which only the id is known.
-        """
-        self.dependencies_with_full_info = []
-        self.dependencies_with_id_only = []
-        for dep in deps:
-            if isinstance(dep, Changeset):
-                self.dependencies_with_full_info.append(dep)
-            else:
-                self.dependencies_with_id_only.append(dep)
-
-    def get_dependencies_with_id_only(self):
-        return self.dependencies_with_id_only[:]
-
-    def get_dependencies_with_full_info(self):
-        return self.dependencies_with_full_info[:]
-
     def get_parents(self):
         return self.parents[:]
 
@@ -192,13 +171,6 @@ class Changeset:
         Get the user who created this changeset.
         """
         return self.user
-
-    def get_dependencies(self):
-        """
-        Return the Changeset object which is this changeset's most
-        recent dependency.
-        """
-        return self.dependencies[:]
             
     def set_id(self, id_):
         """
@@ -252,18 +224,6 @@ class Changeset:
                 self.parents.remove(parent)
                 break
 
-    
-    def get_dependency_chain(self):
-        chain = set([])
-        still_to_check_queue = self.get_dependencies_with_full_info()
-        while len(still_to_check_queue) > 0:
-            el = still_to_check_queue.pop(0)
-            if el in chain:
-                continue
-            chain.update([el])
-            still_to_check_queue += el.get_dependencies_with_full_info()
-        return chain
-        
     def set_unaccounted_changesets(self, css):
         """
         Sometimes the changesets could be calculated elsewhere. Just
@@ -281,6 +241,8 @@ class Changeset:
         return self.preceding_changesets[:]
 
     def add_to_unaccounted_changesets(self, cs, index, ordered_changesets):
+        if self.preceding_changesets == None:
+            self.preceding_changesets = []
         i = index
         insertion_point = 0
         preceding_css = set(self.preceding_changesets)
@@ -293,54 +255,6 @@ class Changeset:
                 break
             i += 1
         self.preceding_changesets.insert(insertion_point, cs)
-
-
-    def find_unaccounted_changesets(self, prev_css):
-        # when this has no dependencies, the unacounted changesets are
-        # all the previous changesets with no dependenies.
-        # Constant time
-        if len(self.parents) == 0:
-            self.preceding_changesets = prev_css[:]
-            return self.preceding_changesets
-
-        i = len(prev_css)-1 # index to prev_css to later look through
-        # With one dependency, linear time at worst. Should be closer
-        # to constant time
-        if len(self.parents) == 1:
-            dep = self.parents[0]
-            self.preceding_changesets = dep.get_unaccounted_changesets()
-            while not prev_css[i] == dep:
-                i -= 1
-        # with multiple dependencies, quadratic time? Still not good
-        else:
-            # get the unique list of all unacounted changsets from
-            # dependencies
-            p = set([])
-            for dep in self.parents:
-                #TODO HERE! WRONG! Can't just add up the unaccounted
-                #changesets from deps because a cs unnaccounted in
-                # one line could be accounted for in the another
-                p.update(dep.get_unaccounted_changesets())
-            chain = self.get_dependency_chain()
-            p -= chain
-            p = list(p)
-            # sort those changesets into correct order
-            self.preceding_changesets = []
-            for prev_cs in prev_css:
-                if len(p) == 1:
-                    self.preceding_changesets.append(prev_cs)
-                    while not prev_css[i] == prev_cs:
-                        i -=1
-                    break
-                if prev_cs in p:
-                    self.preceding_changesets.append(prev_cs)
-                    p.remove(prev_cs)
-
-        # Here all cached unknown changesets are in place in
-        # self.preceding_changesets and i is set to the index in
-        # prev_css of the most recent dependency to this changeset.
-        self.preceding_changesets += prev_css[i+1:]
-        return self.preceding_changesets
         
     def ot(self):
         """

@@ -362,16 +362,14 @@ class Document:
         for cs in m['history']:
             # build historical changeset
             hcs = build_changeset_from_dict(cs,self)
-            if hcs.get_dependencies() == []:
+            if hcs.get_parents() == []:
                 self.root_changeset = hcs
             self.add_to_known_changesets(hcs)
         self.relink_changesets()
         self.ordered_changesets = self.tree_to_list()
         self.ordered_changesets_set_cache = set(self.ordered_changesets)
-        prev = []
-        for cs in self.ordered_changesets:
-            cs.find_unaccounted_changesets(prev)
-            prev.append(cs)
+        for i, cs in enumerate(self.ordered_changesets):
+            self.update_unaccounted_changesets(cs, i)
             
     def relink_changesets(self):
         for cs in self.all_known_changesets.values():
