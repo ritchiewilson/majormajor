@@ -123,17 +123,6 @@ class MajorMajor:
                 return doc
         return None
 
-    def add_local_op(self, doc, op):
-        """
-        Add an opperation to the given doc.
-
-        TODO: is this worthless? Should be part of document.
-        """
-        doc.add_local_op(op)
-        doc.close_changeset()
-        cs = doc.get_last_changeset()
-        self.send_changeset(cs)
-
     def send_changeset(self, cs):
         """
         Build the message object to send to other collaborators.
@@ -168,8 +157,6 @@ class MajorMajor:
             return_msg = self.receive_changeset(m)
         if action == 'send_changesets':
             return_msg = self.receive_changesets(m)
-        if action == 'cursor':
-            return_msg = self.update_cursor(m)
         if action == 'invite_to_document':
             return_msg = self.accept_invitation_to_document(m)
         if action == 'request_snapshot':
@@ -217,6 +204,8 @@ class MajorMajor:
         return msg
 
     def _sync_document(self, msg=None, doc_id=None):
+        if self.drop_random_css:
+            return
         if doc_id == None:
             doc_id=msg['doc_id']
         doc = self.get_document_by_id(doc_id)
@@ -373,19 +362,6 @@ class MajorMajor:
                'doc_id': doc_id}
         self.broadcast(msg)
         return msg
-
-        
-    def update_cursor(self, msg):
-        """
-        Update the cursor position of a remote collaborator.
-        """
-        for c in self.connections:
-            if c.user == msg['user']:
-                if c.cursor['stamp'] < msg['cursor']['stamp']:
-                    c.cursor = msg['cursor']
-                break
-        for callback in self.signal_callbacks['remote-cursor-update']:
-            callback()
             
     def announce(self):
         """
@@ -500,19 +476,3 @@ class MajorMajor:
         'accept-invitation': [],
         }
 
-    
-class RequestChangesetCounter:
-    def __init__(self, doc, cs_id):
-        self.doc = doc
-        self.cs_id = cs_id
-        self.countdown = 0
-        self.next_start = 1
-
-    def time_for_new_request(self):
-        if self.countdown == 0:
-            self.countdown = self.next_start
-            self.next_start = min(self.next_start*2, 15)
-            return True
-        else:
-            self.countdown -= 1
-            return False
