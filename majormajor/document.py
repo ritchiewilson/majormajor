@@ -22,7 +22,7 @@ import uuid
 import copy
 from changeset import Changeset
 from op import Op
-from utils import build_changeset_from_dict, call_counter
+from utils import build_changeset_from_dict
 
 class Document:
 
