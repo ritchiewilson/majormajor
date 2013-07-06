@@ -47,7 +47,7 @@ class MajorMajor:
             GObject.timeout_add(20, self.test_thousands_ops)
             GObject.timeout_add(500, self.close_open_changesets)
             GObject.timeout_add(2000, self._retry_request_changesets)
-            GObject.timeout_add(10000, self._sync_status_request)
+            GObject.timeout_add(5000, self._sync_documents)
         self.big_insert = False
         self.drop_random_css = False
 
@@ -182,11 +182,8 @@ class MajorMajor:
             return_msg = self.receive_history(m)
         if action == 'request_changesets':
             return_msg = self.send_changesets(m)
-        if action == 'sync_request':
-            return_msg = self._sync_status_response(m)
-        if action == 'sync_status':
-            return_msg = self._handle_sync_status_response(m)
-        
+        if action == 'sync':
+            return_msg = self._sync_document(m)        
 
         return return_msg
 
@@ -211,54 +208,57 @@ class MajorMajor:
             return True
         return msg
 
-    def _sync_status_request(self):
-        doc = self.documents[0]
+    def _sync_documents(self):
+        msg = {}
+        for doc in self.documents:
+            self._sync_document(doc_id=doc.get_id())
+        if self.event_loop:
+            return True
+        return msg
+
+    def _sync_document(self, msg=None, doc_id=None):
+        if doc_id == None:
+            doc_id=msg['doc_id']
+        doc = self.get_document_by_id(doc_id)
+        if not doc:
+            return
+        request_css, send_css = [], []
+        synced = False
+        if msg:
+            # if there wasa message, and it was synced, quit
+            if msg['synced'] == True:
+                return
+
+            # first accept any incoming changesets, collecting missing
+            # changesets.
+
+            r_css = {'css':msg['send_css']}
+            response = self.receive_changesets(r_css, doc_id=doc_id)
+
+            # add to that any other missing deps
+            _request_css, _send_css = doc.get_sync_status(msg['deps'])
+            request_css = list(set(response['missing_dep_ids'] + _request_css))
+
+            # get the rest of changesets to send
+            send_local_dep_css = \
+                    [doc.get_changeset_by_id(cs) \
+                     for cs in msg['request_css'] if doc.knows_changeset(cs)]
+            send_css = [cs.to_dict() \
+                        for cs in list(set(send_local_dep_css + _send_css))]
+            
+            if not request_css and not send_css:
+                synced = True
         deps = [dep.get_id() for dep in doc.get_dependencies()]
-        msg = {'action': 'sync_request',
+        msg = {'action': 'sync',
                'doc_id': doc.get_id(),
                'user': doc.get_user(),
-               'deps': deps}
-        self.broadcast(msg)
-        return msg
-
-    def _sync_status_response(self, m):
-        doc = self.get_document_by_id(m['doc_id'])
-        if not doc:
-            return
-        request_css, send_css = doc.get_sync_status(m['deps'])
-        msg = {'action':'sync_status',
-               'user':self.default_user,
-               'doc_id':doc.get_id(),
-               'synced': True}
-        if request_css or send_css:
-            deps = [dep.get_id() for dep in doc.get_dependencies()]
-            msg = {'action':'sync_status',
-                   'user':self.default_user,
-                   'doc_id':doc.get_id(),
-                   'synced': False,
-                   'request_css':request_css,
-                   'send_css': send_css,
-                   'deps': deps}
-        return msg
-
-    def _handle_sync_status_response(self, m):
-        doc = self.get_document_by_id(m['doc_id'])
-        if not doc:
-            return
-        if m['synced'] == True:
-            return
-        request_css = self.receive_changesets(m['send_changesets'])
-        send_css = [doc.get_changeset_by_id(cs).to_dict() \
-                    for cs in m['request_css'] if doc.knows_changeset(cs)]
-        msg = {'action':'sync_status_response',
-               'user':self.default_user,
-               'doc_id':doc.get_id(),
-               'synced': False,
+               'synced': synced,
                'request_css':request_css,
                'send_css': send_css,
                'deps': deps}
         self.broadcast(msg)
         return msg
+
         
     def receive_announce(self, m):
         msg = self.invite_to_document(m['user'], self.documents[0].get_user(),
@@ -457,17 +457,20 @@ class MajorMajor:
         m['css'] = [m['cs']]
         return self.receive_changesets(m)
     
-    def receive_changesets(self, m):
+    def receive_changesets(self, m, doc_id=None):
         """
         Handler for recieving changest messages from remote
         collaborators.
         """
+        msg = {'one_inserted':False,
+               'missing_dep_ids':[]}
         # For testing. If this flag is set, drop changesets at random
         # to simulate network problems.
         if self.drop_random_css and random.random() < 0.5:
-            return 'fail'
-
-        doc = self.get_document_by_id(m['doc_id'])
+            return msg
+        if doc_id == None:
+            doc_id = m['doc_id']
+        doc = self.get_document_by_id(doc_id)
         if not doc:
             return
 
