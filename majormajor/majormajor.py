@@ -181,7 +181,7 @@ class MajorMajor:
         if action == 'send_history':
             return_msg = self.receive_history(m)
         if action == 'request_changesets':
-            return_msg = self.send_changesets(m, True)
+            return_msg = self.send_changesets(m)
         if action == 'sync_request':
             return_msg = self._sync_status_response(m)
         if action == 'sync_status':
@@ -419,7 +419,7 @@ class MajorMajor:
         self.broadcast(msg)
         return msg
 
-    def send_changesets(self, m, debug=False):
+    def send_changesets(self, m):
         msg = {}
         doc = self.get_document_by_id(m['doc_id'])
         if not doc:
