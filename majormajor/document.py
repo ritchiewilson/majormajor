@@ -121,15 +121,10 @@ class Document:
     def get_changesets(self):
         return self.changesets
 
-    def get_sync_status(self, deps):
-        local_dep_ids = [dep.get_id() for dep in self.dependencies]
-        css = [dep for dep in deps if dep not in  local_dep_ids]
-        if css:
-            return 'request', css
-        css = [dep for dep in deps if not self.knows_changeset(dep)]
-        if css:
-            return 'send', css
-        return 'synced', []
+    def get_sync_status(self, remote_deps):
+        request_css = [dep for dep in remote_deps if not self.knows_changeset(dep)]
+        send_css = [cs for cs in self.dependencies if not cs.get_id() in remote_deps]
+        return request_css, send_css
 
     def add_to_pending_new_changesets(self, cs):
         """
@@ -236,6 +231,21 @@ class Document:
             cs.set_snapshot_cache_is_valid(True)
         return cs
 
+    def receive_changesets(self, css):
+        response = {'one_inserted' : False,
+                    'missing_dep_ids': [],
+                    'old_state': copy.deepcopy(self.get_snapshot())}
+
+        for cs in css:
+            r = self.receive_changeset(cs)
+            status = r['status']
+            if status == 'success':
+                response['one_inserted'] = True
+            elif status == 'missing_deps':
+                response['missing_dep_ids'] += r['missing_dep_ids']
+
+        return response
+        
 
     def receive_changeset(self, cs):
         """
@@ -257,8 +267,8 @@ class Document:
         # list, then return status with needed changeset ids
         if not self.has_needed_dependencies(cs):
             dep_ids = self.add_to_pending_new_changesets(cs)
-            return {'status':'missing_dependencies', \
-                    'dep_ids': dep_ids}
+            return {'status':'missing_deps', \
+                    'missing_dep_ids': dep_ids}
 
         # from this point on, the changeset can be received, so start
         # building the response status

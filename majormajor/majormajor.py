@@ -47,7 +47,7 @@ class MajorMajor:
             GObject.timeout_add(20, self.test_thousands_ops)
             GObject.timeout_add(500, self.close_open_changesets)
             GObject.timeout_add(2000, self._retry_request_changesets)
-            GObject.timeout_add(10000, self._check_sync_status)
+            GObject.timeout_add(10000, self._sync_status_request)
         self.big_insert = False
         self.drop_random_css = False
 
@@ -138,7 +138,7 @@ class MajorMajor:
         """
         Build the message object to send to other collaborators.
         """
-        msg = {'action':'changeset',
+        msg = {'action':'send_changeset',
                'cs':cs.to_dict(),
                'cs_id': cs.get_id(),
                'user':cs.get_user(),
@@ -164,8 +164,10 @@ class MajorMajor:
         action = m['action']
         if action == 'announce':
             return_msg = self.receive_announce(m)
-        if action == 'changeset':
+        if action == 'send_changeset':
             return_msg = self.receive_changeset(m)
+        if action == 'send_changesets':
+            return_msg = self.receive_changesets(m)
         if action == 'cursor':
             return_msg = self.update_cursor(m)
         if action == 'invite_to_document':
@@ -181,7 +183,10 @@ class MajorMajor:
         if action == 'request_changesets':
             return_msg = self.send_changesets(m, True)
         if action == 'sync_request':
-            return_msg = self.sync_response(m)
+            return_msg = self._sync_status_response(m)
+        if action == 'sync_status':
+            return_msg = self._handle_sync_status_response(m)
+        
 
         return return_msg
 
@@ -206,7 +211,7 @@ class MajorMajor:
             return True
         return msg
 
-    def _check_sync_status(self):
+    def _sync_status_request(self):
         doc = self.documents[0]
         deps = [dep.get_id() for dep in doc.get_dependencies()]
         msg = {'action': 'sync_request',
@@ -216,22 +221,45 @@ class MajorMajor:
         self.broadcast(msg)
         return msg
 
-    def sync_response(self, m):
+    def _sync_status_response(self, m):
         doc = self.get_document_by_id(m['doc_id'])
         if not doc:
             return
-        action, css = doc.get_sync_status(m['deps'])
-        msg = 'in-sync'
-        if action == 'request':
-            print 'syncing.....'
-            msg = self.request_changesets(m['doc_id'], css)
-        elif action == 'send':
-            print 'syncing.....'
-            msg = self.send_changesets(m['doc_id'], css)
-        else:
-            print 'in-sync'
+        request_css, send_css = doc.get_sync_status(m['deps'])
+        msg = {'action':'sync_status',
+               'user':self.default_user,
+               'doc_id':doc.get_id(),
+               'synced': True}
+        if request_css or send_css:
+            deps = [dep.get_id() for dep in doc.get_dependencies()]
+            msg = {'action':'sync_status',
+                   'user':self.default_user,
+                   'doc_id':doc.get_id(),
+                   'synced': False,
+                   'request_css':request_css,
+                   'send_css': send_css,
+                   'deps': deps}
         return msg
-            
+
+    def _handle_sync_status_response(self, m):
+        doc = self.get_document_by_id(m['doc_id'])
+        if not doc:
+            return
+        if m['synced'] == True:
+            return
+        request_css = self.receive_changesets(m['send_changesets'])
+        send_css = [doc.get_changeset_by_id(cs).to_dict() \
+                    for cs in m['request_css'] if doc.knows_changeset(cs)]
+        msg = {'action':'sync_status_response',
+               'user':self.default_user,
+               'doc_id':doc.get_id(),
+               'synced': False,
+               'request_css':request_css,
+               'send_css': send_css,
+               'deps': deps}
+        self.broadcast(msg)
+        return msg
+        
     def receive_announce(self, m):
         msg = self.invite_to_document(m['user'], self.documents[0].get_user(),
                                 self.documents[0].get_id())
@@ -396,10 +424,13 @@ class MajorMajor:
         doc = self.get_document_by_id(m['doc_id'])
         if not doc:
             return
-        for cs_id in m['cs_ids']:
-            cs = doc.get_changeset_by_id(cs_id)
-            if cs:
-                msg = self.send_changeset(cs)
+        css = [doc.get_changeset_by_id(cs).to_dict() for cs in m['cs_ids'] \
+               if doc.knows_changeset(cs)]
+        msg = {"action":"send_changesets",
+               "user":self.default_user,
+               "doc_id":doc.get_id(),
+               'css':css}
+        self.broadcast(msg)
         return msg
         
     def broadcast(self, msg):
@@ -423,6 +454,10 @@ class MajorMajor:
         self.signal_callbacks[signal].append(callback)
 
     def receive_changeset(self, m):
+        m['css'] = [m['cs']]
+        return self.receive_changesets(m)
+    
+    def receive_changesets(self, m):
         """
         Handler for recieving changest messages from remote
         collaborators.
@@ -436,22 +471,17 @@ class MajorMajor:
         if not doc:
             return
 
-        response =  doc.receive_changeset(m['cs'])
-        status = response['status']
-        if status == 'known_changeset':
-            return status
-        elif status == 'missing_dependencies':
-            dep_ids = response['dep_ids']
-            if dep_ids:
+        msg =  doc.receive_changesets(m['css'])
+        dep_ids = msg['missing_dep_ids']
+        if dep_ids:
                 self.add_to_requested_changesets(doc.get_id(), dep_ids)
                 self.request_changesets(doc.get_id(), dep_ids)
-            return status
-            
-        # So the status was 'success'
-        opcodes = doc.get_diff_opcode(response['old_state'])
-        for callback in self.signal_callbacks['receive-changeset']:
-            callback(opcodes)
-        return status
+
+        if msg['one_inserted']:
+            opcodes = doc.get_diff_opcode(msg['old_state'])
+            for callback in self.signal_callbacks['receive-changeset']:
+                callback(opcodes)
+        return msg
             
     def add_to_requested_changesets(self, doc_id, dep_ids):
         if not doc_id in self.requested_changesets:
