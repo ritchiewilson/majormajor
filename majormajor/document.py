@@ -309,7 +309,7 @@ class Document:
             cs.get_ancestors()
         
         i = self.insert_changeset_into_ordered_list(cs)
-        self.update_unaccounted_changesets(cs)
+        self.update_unaccounted_changesets(cs, index=i)
         
         self.ot(i-1)
         self.rebuild_snapshot()
@@ -440,7 +440,7 @@ class Document:
                 self.ordered_changesets[index].set_snapshot_cache_is_valid(True)
             index += 1
 
-    def update_unaccounted_changesets(self, cs):
+    def update_unaccounted_changesets(self, cs, index=None):
         """
         cs has just been inserted into the list. First find all
         unaccounted changesets which come before it. Then add this
@@ -448,7 +448,7 @@ class Document:
         """
         unaccounted_css = []
         deps = cs.get_parents()
-        pos_of_cs = self.ordered_changesets.index(cs)
+        pos_of_cs = self.ordered_changesets.index(cs) if index == None else index
         i = pos_of_cs - 1
         while deps and i > 0:
             old_cs = self.ordered_changesets[i]
