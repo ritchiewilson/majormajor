@@ -183,24 +183,23 @@ class StringDeleteOp(Op):
             
         # there are six ways two delete ranges can overlap and
         # each one is a different case.
-        if self.t_action == 'sd':
-            srs = self.t_offset # self range start
-            sre = self.t_offset + self.t_val # self range end
-            oprs = op.t_offset # prev op range start
-            opre = op.t_offset + op.t_val # prev op range end
-            if sre < oprs:
-                #only case for which nothing changes
-                pass
-            elif srs >= opre:
-                self.t_offset -= op.t_val
-            elif srs >= oprs and sre >= opre:
-                self.t_val += (self.t_offset - (op.t_offset + op.t_val))
-                self.t_val = max(0, self.t_val)
-                self.t_offset = op.t_offset
-            elif sre >= opre:
-                self.t_val -= op.t_val
-            else:
-                self.t_val = op.t_offset - self.t_offset
+        srs = self.t_offset # self range start
+        sre = self.t_offset + self.t_val # self range end
+        oprs = op.t_offset # prev op range start
+        opre = op.t_offset + op.t_val # prev op range end
+        if sre < oprs:
+            #only case for which nothing changes
+            pass
+        elif srs >= opre:
+            self.t_offset -= op.t_val
+        elif srs >= oprs and sre >= opre:
+            self.t_val += (self.t_offset - (op.t_offset + op.t_val))
+            self.t_val = max(0, self.t_val)
+            self.t_offset = op.t_offset
+        elif sre >= opre:
+            self.t_val -= op.t_val
+        else:
+            self.t_val = op.t_offset - self.t_offset
 
 class SetOp(Op):
     pass
