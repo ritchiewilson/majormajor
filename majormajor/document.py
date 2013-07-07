@@ -282,14 +282,18 @@ class Document:
             self.send_queue.append(current_cs)
             response['closed_changeset'] = current_cs
 
-        self.activate_changeset_in_document(cs)
+        # save theindex at which the changeset was inserted.
+        index = self.activate_changeset_in_document(cs)
         
         #if len(cs.get_parents()) > 1:
             #print "needed OT", len(self.ordered_changesets)
 
         # check the pending list for anything that can be inserted.
         self.pull_from_pending_list()            
-        
+
+        self.ot(index-1)
+        self.rebuild_snapshot()
+
         return response
 
     def activate_changeset_in_document(self, cs):
@@ -308,17 +312,15 @@ class Document:
         if cs._is_ancestor_cache:
             cs.get_ancestors()
         
-        i = self.insert_changeset_into_ordered_list(cs)
-        self.update_unaccounted_changesets(cs, index=i)
+        index = self.insert_changeset_into_ordered_list(cs)
+        self.update_unaccounted_changesets(cs, index=index)
         
-        self.ot(i-1)
-        self.rebuild_snapshot()
-
         # remove document dependencies covered by this new changeset
         for parent in cs.get_parents():
             if parent in self.dependencies:
                 self.dependencies.remove(parent)
         self.dependencies.append(cs)
+        return index
 
         
     def pull_from_pending_list(self):
