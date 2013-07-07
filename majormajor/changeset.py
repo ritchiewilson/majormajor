@@ -251,20 +251,28 @@ class Changeset:
         Determine where the given cs should go in this Changeset's
         ordered list of unaccounted changesets.
         """
+        # When this changeset has one parent, and the parent has only
+        # one child (this), they have the same preceding
+        # changesets. Common, and much faster.
+        if len(self.get_parents()) == 1:
+            parent = self.get_parents()[0]
+            if len(parent.get_children()) == 1:
+                self.preceding_changesets = parent.get_unaccounted_changesets()
+                return
+
         if self.preceding_changesets == None:
             self.preceding_changesets = []
         i = index
-        insertion_point = 0
         preceding_css = set(self.preceding_changesets)
         while i < len(ordered_changesets):
             if ordered_changesets[i] == self:
-                insertion_point = len(self.get_unaccounted_changesets())
+                self.preceding_changesets.append(cs)
                 break
             if ordered_changesets[i] in preceding_css:
                 insertion_point = self.preceding_changesets.index(ordered_changesets[i])
+                self.preceding_changesets.insert(insertion_point, cs)
                 break
             i += 1
-        self.preceding_changesets.insert(insertion_point, cs)
         
     def ot(self):
         """
