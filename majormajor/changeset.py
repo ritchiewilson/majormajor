@@ -241,6 +241,16 @@ class Changeset:
         return self.preceding_changesets[:]
 
     def add_to_unaccounted_changesets(self, cs, index, ordered_changesets):
+        """
+        This changeset keeps a list of changesets which come before it in
+        order, but it did not know about. The given cs is the
+        changeset which was just inserted into the documents
+        ordered_changesets, and for cnvenience, index is where it was
+        inserted. ordered_changeset is the doc's ordered_changest.
+
+        Determine where the given cs should go in this Changeset's
+        ordered list of unaccounted changesets.
+        """
         if self.preceding_changesets == None:
             self.preceding_changesets = []
         i = index
