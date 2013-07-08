@@ -284,9 +284,6 @@ class Document:
 
         # save theindex at which the changeset was inserted.
         index = self.activate_changeset_in_document(cs)
-        
-        #if len(cs.get_parents()) > 1:
-            #print "needed OT", len(self.ordered_changesets)
 
         # check the pending list for anything that can be inserted.
         self.pull_from_pending_list()            
@@ -454,20 +451,17 @@ class Document:
             old_cs = self.ordered_changesets[i]
             if old_cs in deps:
                 if len(deps) == 1:
-                    # if this is the last dep, then cs shares it's unknown dependencies
-                    unaccounted_css = old_cs.get_unaccounted_changesets() + unaccounted_css
+                    # if this is the last dep, then cs (generally)
+                    # shares it's unknown dependencies
+                    rev_ucss = reversed(old_cs.get_unaccounted_changesets())
+                    ucss = [ucs for ucs in rev_ucss if not cs.has_ancestor(ucs)]
+                    unaccounted_css.extend(ucss)
                     break
                 deps.remove(old_cs)
             elif not cs.has_ancestor(old_cs) and not old_cs in unaccounted_css:
-                unaccounted_css.insert(0, old_cs)
+                unaccounted_css.append(old_cs)
             i -= 1
-        i = 0
-        while i < len(unaccounted_css):
-            past_cs = unaccounted_css[i]
-            if cs.has_ancestor(past_cs ):
-                unaccounted_css.remove(past_cs)
-            else:
-                i += 1
+        unaccounted_css.reverse()
         cs.set_unaccounted_changesets(unaccounted_css)
 
         # now add the given cs to all subsequent changesets which need it
