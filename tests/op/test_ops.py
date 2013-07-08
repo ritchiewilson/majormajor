@@ -82,36 +82,48 @@ class TestOTStringInsertDelete:
         
 
         # op1 deletes a range after op2, so should not affect it
+        #                |-- op1 --|
+        # |-- op2 --|
         op2 = Op('sd', [], offset=1, val=2)
         op2.ot(cs1)
         assert op2.t_offset == 1
         assert op2.t_val == 2
 
         # The end of op3 overlaps the start of op 1
+        #          |-- op1 --|
+        #   |-- op3 --|
         op3 = Op('sd', [], offset=2, val=2)
         op3.ot(cs1)
         assert op3.t_offset == 2
         assert op3.t_val == 1
 
         # op1 range is encompased by op 4 range
+        #     |-- op1 --|
+        #   |---- op4 ----|
         op4 = Op('sd', [], offset=2, val=6)
         op4.ot(cs1)
         assert op4.t_offset == 2
         assert op4.t_val == 3
 
         # op5 range is encompased by op1 range
-        op5 = Op('sd', [], offset=4, val=2)
+        #   |---- op1 ----|
+        #     |-- op5 --|
+        op5 = Op('sd', [], offset=4, val=1)
         op5.ot(cs1)
         assert op5.t_offset == 3
         assert op5.t_val == 0
 
         # start of op6 range overlaps end of op1 range
+        #   |-- op1 --|
+        #         |-- op6 --|
         op6 = Op('sd', [], offset=5, val=3)
         op6.ot(cs1)
         assert op6.t_offset == 3
         assert op6.t_val == 2
 
         # start of op7 range is after start of op1 range
+        #   |-- op1 --|
+        #                |-- op7 --|
         op7 = Op('sd', [], offset=8, val=3)
         op7.ot(cs1)
         assert op7.t_offset == 5

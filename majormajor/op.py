@@ -181,23 +181,44 @@ class StringDeleteOp(Op):
         if self.t_path != op.t_path:
             return
             
-        # there are six ways two delete ranges can overlap and
-        # each one is a different case.
         srs = self.t_offset # self range start
         sre = self.t_offset + self.t_val # self range end
         oprs = op.t_offset # prev op range start
         opre = op.t_offset + op.t_val # prev op range end
-        if sre < oprs:
-            #only case for which nothing changes
+        # there are six ways two delete ranges can overlap and
+        # each one is a different case.
+
+        # case 1
+        #                |-- prev op --|
+        # |-- self --|
+        if sre <= oprs:
             pass
+        # case 2
+        #   |-- prev op --|
+        #                 |-- self --|            
         elif srs >= opre:
             self.t_offset -= op.t_val
-        elif srs >= oprs and sre >= opre:
+        # case 3
+        #   |-- prev op --|
+        #           |-- self --|            
+        elif srs >= oprs and sre > opre:
             self.t_val += (self.t_offset - (op.t_offset + op.t_val))
             self.t_val = max(0, self.t_val)
             self.t_offset = op.t_offset
+        # case 4
+        #   |--- prev op ---|
+        #     |-- self --|            
+        elif srs >= oprs and sre <= opre:
+            self.t_offset = op.t_offset
+            self.t_val = 0
+        # case 5
+        #     |-- prev op --|
+        #   |----- self ------|            
         elif sre >= opre:
             self.t_val -= op.t_val
+        # case 6
+        #      |-- prev op --|
+        #   |-- self --|            
         else:
             self.t_val = op.t_offset - self.t_offset
 
