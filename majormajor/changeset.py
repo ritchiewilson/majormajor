@@ -260,8 +260,11 @@ class Changeset:
                 self.preceding_changesets = parent.get_unaccounted_changesets()
                 return
 
-        if self.preceding_changesets == None:
-            self.preceding_changesets = []
+        # when the preceding changesets have not been calculated yet,
+        # or is empty, just insert the changeset and return.
+        if self.preceding_changesets in [None, []]:
+            self.preceding_changesets = [cs]
+            return
         i = index
         preceding_css = set(self.preceding_changesets)
         while i < len(ordered_changesets):
