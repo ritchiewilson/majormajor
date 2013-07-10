@@ -33,6 +33,8 @@ class Changeset:
         self.set_as_snapshot_cache()
         self._is_ancestor_cache = False
         self.set_as_ancestor_cache()
+        self.hazards_from_previous_changesets = []
+        self.hazards_this_changeset_causes = []
 
     def is_empty(self):
         return len(self.ops) == 0
@@ -190,6 +192,7 @@ class Changeset:
             raise Exception("Can't add op. Changeset is already closed.")
         if op in self.ops:
             raise Exception("Can't add same op object multiple times.")
+        op.set_changeset(self)
         self.ops.append(op)
         return True
 
@@ -287,9 +290,13 @@ class Changeset:
             op.reset_transformations()
         # those 'preceding_changesets' need to be used to transform
         # this changeset's operations.
+        hazards = self.hazards_from_previous_changesets[:]
         for pc in self.preceding_changesets:
             for op in self.ops:
-                op.ot(pc)
+                new_hazards = op.ot(pc, hazards)
+                hazards.extend(new_hazards)
+                self.hazards_this_changeset_causes.extend(new_hazards)
+        return self.hazards_this_changeset_causes[:]
 
     def to_jsonable(self):
         """

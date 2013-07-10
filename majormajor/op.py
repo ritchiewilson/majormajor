@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from hazard import Hazard
+
 class Op(object):
     """
     offset is only used for string manipulation
@@ -45,6 +47,14 @@ class Op(object):
         self.t_val = val
         self.t_offset = offset
         self.noop = False
+
+        self.changeset = None
+
+    def set_changeset(self, cs):
+        self.changeset = cs
+
+    def get_changeset(self):
+        return self.changeset
 
     def get_path(self):
         return self.path[:]
@@ -77,17 +87,36 @@ class Op(object):
         self.t_offset = self.offset
         self.noop = False
         
-    def ot(self, pc):
+    def ot(self, pc, hazards):
         """
         pc: Changeset - previous changeset which has been applied but
         was not a dependency of this operation. This operation needs
         to be transformed to accomidate pc.
         """
+        # first apply all known hazards
+        for hazard in hazards:
+            print self.get_changeset()
+            print pc
+            if pc == hazard.base_cs:
+                self.apply_hazard(hazard)
+        new_hazards = []
         for op in pc.ops:
             func_name = self.json_opperations[op.action]
-            func = getattr(self, func_name)
-            func(op)
+            transform_function = getattr(self, func_name)
+            hazard = transform_function(op)
+            if hazard:
+                new_hazards.append(hazard)
+        return new_hazards
+                
 
+    def apply_hazard(self, hazard):
+        print self.t_offset
+        if self.is_string_transform():
+            if hazard.is_string_delete_range_overlap_hazard():
+                if self.t_offset >= hazard.get_delete_overlap_start():
+                    self.t_offset += hazard.get_delete_overlap_range_size()
+        print self.t_offset
+            
     def set_transform(self, op):
         """
         Transfrom this opperation for a when a previously unknown
@@ -120,6 +149,11 @@ class Op(object):
         """
         pass
                 
+    def is_string_transform(self):
+        return False
+
+    def is_string_delete(self):
+        return False
 
     json_opperations = {
         'set': 'set_transform',
@@ -135,13 +169,15 @@ class Op(object):
     }
 
 class StringInsertOp(Op):
+    def is_string_transform(self):
+        return True
+        
     def string_insert_transform(self, op):
         if self.t_path != op.t_path:
             return
 
-        if self.t_action == 'si':
-            if self.t_offset >= op.t_offset:
-                self.t_offset += len(op.t_val)
+        if self.t_offset >= op.t_offset:
+            self.t_offset += len(op.t_val)
 
     def string_delete_transform(self, op):
         """
@@ -159,6 +195,11 @@ class StringInsertOp(Op):
  
         
 class StringDeleteOp(Op):
+    def is_string_transform(self):
+        return True
+
+    def is_string_delete(self):
+        return True
     
     def string_insert_transform(self, op):
         if self.t_path != op.t_path:
@@ -180,6 +221,8 @@ class StringDeleteOp(Op):
         """
         if self.t_path != op.t_path:
             return
+
+        hazard = False
             
         srs = self.t_offset # self range start
         sre = self.t_offset + self.t_val # self range end
@@ -195,32 +238,38 @@ class StringDeleteOp(Op):
             pass
         # case 2
         #   |-- prev op --|
-        #                 |-- self --|            
+        #                   |-- self --|
         elif srs >= opre:
             self.t_offset -= op.t_val
         # case 3
         #   |-- prev op --|
-        #           |-- self --|            
+        #           |-- self --|
         elif srs >= oprs and sre > opre:
+            hazard = Hazard(op, self)
             self.t_val += (self.t_offset - (op.t_offset + op.t_val))
             self.t_val = max(0, self.t_val)
             self.t_offset = op.t_offset
         # case 4
         #   |--- prev op ---|
-        #     |-- self --|            
+        #     |-- self --|
         elif srs >= oprs and sre <= opre:
+            hazard = Hazard(op, self)
             self.t_offset = op.t_offset
             self.t_val = 0
         # case 5
         #     |-- prev op --|
-        #   |----- self ------|            
+        #   |----- self ------|
         elif sre >= opre:
+            hazard = Hazard(op, self)
             self.t_val -= op.t_val
         # case 6
         #      |-- prev op --|
-        #   |-- self --|            
+        #   |-- self --|
         else:
+            hazard = Hazard(op, self)
             self.t_val = op.t_offset - self.t_offset
+
+        return hazard
 
 class SetOp(Op):
     pass
