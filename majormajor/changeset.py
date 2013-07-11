@@ -33,8 +33,6 @@ class Changeset:
         self.set_as_snapshot_cache()
         self._is_ancestor_cache = False
         self.set_as_ancestor_cache()
-        self.hazards_from_previous_changesets = []
-        self.hazards_this_changeset_causes = []
 
     def is_empty(self):
         return len(self.ops) == 0
@@ -280,7 +278,7 @@ class Changeset:
                 break
             i += 1
         
-    def ot(self):
+    def ot(self, hazards=[]):
         """
         All the unaccounted changesets should have already been
         determined. Loop through those, using them to transform this
@@ -288,15 +286,15 @@ class Changeset:
         """
         for op in self.ops:
             op.reset_transformations()
+        hazards_this_changeset_causes = []
         # those 'preceding_changesets' need to be used to transform
         # this changeset's operations.
-        hazards = self.hazards_from_previous_changesets[:]
         for pc in self.preceding_changesets:
             for op in self.ops:
                 new_hazards = op.ot(pc, hazards)
                 hazards.extend(new_hazards)
-                self.hazards_this_changeset_causes.extend(new_hazards)
-        return self.hazards_this_changeset_causes[:]
+                hazards_this_changeset_causes.extend(new_hazards)
+        return hazards_this_changeset_causes[:]
 
     def to_jsonable(self):
         """

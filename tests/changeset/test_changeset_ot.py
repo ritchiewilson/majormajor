@@ -82,6 +82,7 @@ class TestChangesetOT:
 
         B2 = Changeset(doc.get_id(), 'u2', [B1])
         B2.add_op(Op('si', [], offset=4, val='jkl'))
+        B2.set_id('B2')
         doc.receive_changeset(B2)
         op = B2.get_ops()[0]
         assert op.t_offset == 9

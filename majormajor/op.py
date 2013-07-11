@@ -87,20 +87,21 @@ class Op(object):
         self.t_offset = self.offset
         self.noop = False
         
-    def ot(self, pc, hazards):
+    def ot(self, pc, hazards=[]):
         """
         pc: Changeset - previous changeset which has been applied but
         was not a dependency of this operation. This operation needs
         to be transformed to accomidate pc.
         """
-        # first apply all known hazards
-        for hazard in hazards:
-            print self.get_changeset()
-            print pc
-            if pc == hazard.base_cs:
-                self.apply_hazard(hazard)
         new_hazards = []
-        for op in pc.ops:
+        for i, op in enumerate(pc.ops):
+            # first apply any hazards
+            applicable_hazards = [h for h in hazards \
+                                  if pc == h.base_cs and h.get_base_op_index() == i]
+            for hazard in applicable_hazards:
+                self.apply_hazard(hazard)
+
+            # then run OT, checking for new hazards
             func_name = self.json_opperations[op.action]
             transform_function = getattr(self, func_name)
             hazard = transform_function(op)
@@ -110,13 +111,12 @@ class Op(object):
                 
 
     def apply_hazard(self, hazard):
-        print self.t_offset
         if self.is_string_transform():
             if hazard.is_string_delete_range_overlap_hazard():
                 if self.t_offset >= hazard.get_delete_overlap_start():
                     self.t_offset += hazard.get_delete_overlap_range_size()
-        print self.t_offset
-            
+
+        
     def set_transform(self, op):
         """
         Transfrom this opperation for a when a previously unknown

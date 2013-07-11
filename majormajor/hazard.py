@@ -24,6 +24,12 @@ class Hazard:
         self.conflict_op = conflict_op
         self.base_cs = base_op.get_changeset()
         self.conflict_cs = conflict_op.get_changeset()
+        self.conflict_op_index = None
+        if self.conflict_cs:
+            self.conflict_op_index = self.conflict_cs.get_ops().index(conflict_op)
+        self.base_op_index = None
+        if self.base_cs:
+            self.base_op_index = self.base_cs.get_ops().index(base_op)
         self.hazard_type = None
         self.calculate_hazard_info()
 
@@ -44,6 +50,9 @@ class Hazard:
         return self.delete_overlap_range_start
 
     def get_conflict_op_index(self):
+        return self.conflict_op_index
+
+    def get_base_op_index(self):
         return self.conflict_op_index
 
     def get_delete_overlap_range_size(self):

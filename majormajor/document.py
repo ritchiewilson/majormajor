@@ -50,6 +50,7 @@ class Document:
         self.snapshot = {}
         self.root_changeset = None
         self.dependencies = []
+        self.hazards = []
         # set initial snapshot if called upon
         if not snapshot == None:
             self.set_initial_snapshot(snapshot)
@@ -398,10 +399,31 @@ class Document:
         start onwards.
         """
         i = max(start, 1)
+        self.remove_old_hazards(i)
         while i < len(self.ordered_changesets):
-            self.ordered_changesets[i].ot()
+            cs = self.ordered_changesets[i]
+            hazards = self.get_hazards_for_cs(cs, i)
+            new_hazards = cs.ot(hazards)
+            self.add_new_hazards(new_hazards)
             i += 1
 
+    def add_new_hazards(self, new_hazards):
+        self.hazards.extend(new_hazards)
+        self.hazards.sort(key=lambda h: h.get_conflict_op_index())
+        self.hazards.sort(key=lambda h: self.ordered_changesets.index(h.conflict_cs))
+        self.hazards.sort(key=lambda h: h.get_base_op_index())
+        self.hazards.sort(key=lambda h: self.ordered_changesets.index(h.base_cs))
+
+    def remove_old_hazards(self, index=0):
+        css = set(self.ordered_changesets[index:])
+        self.hazards = [h for h in self.hazards if not h.conflict_cs in css]
+
+    def get_hazards_for_cs(self, cs, index=None):
+        index = index if index else self.ordered_changesets.index(cs)
+        css = set(self.ordered_changesets[index:])
+        hazards = [h for h in self.hazards \
+                   if not h.conflict_cs in css and not cs.has_ancestor(h.base_cs)]
+        return hazards
 
     def has_needed_dependencies(self, cs):
         """
