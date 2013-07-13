@@ -95,29 +95,19 @@ class Op(object):
         """
         new_hazards = []
         for i, op in enumerate(pc.ops):
-            # first apply any hazards
-            applicable_hazards = [h for h in hazards \
-                                  if pc == h.base_cs and h.get_base_op_index() == i]
-            for hazard in applicable_hazards:
-                self.apply_hazard(hazard)
-
+            hazards_after_conflict_point = [h for h in hazards \
+                                            if not h.base_cs == pc or \
+                                            h.get_base_op_index() <= i]
             # then run OT, checking for new hazards
             func_name = self.json_opperations[op.action]
             transform_function = getattr(self, func_name)
-            hazard = transform_function(op)
+            hazard = transform_function(op, hazards_after_conflict_point)
             if hazard:
                 new_hazards.append(hazard)
         return new_hazards
-                
-
-    def apply_hazard(self, hazard):
-        if self.is_string_transform():
-            if hazard.is_string_delete_range_overlap_hazard():
-                if self.t_offset >= hazard.get_delete_overlap_start():
-                    self.t_offset += hazard.get_delete_overlap_range_size()
 
         
-    def set_transform(self, op):
+    def set_transform(self, op, hazards):
         """
         Transfrom this opperation for a when a previously unknown
         opperation was a "set" opperation.
@@ -131,7 +121,7 @@ class Op(object):
         if op_path == self.t_path[:len(op_path)]:
             self.noop = True
 
-    def string_insert_transform(self, op):
+    def string_insert_transform(self, op, hazards):
         """
         Transform this opperation when a previously unknown opperation
         did a string insert.
@@ -140,7 +130,7 @@ class Op(object):
         """
         pass
         
-    def string_delete_transform(self, op):
+    def string_delete_transform(self, op, hazards):
         """
         Transform this opperation when a previously unknown opperation
         did a string deletion.
@@ -172,14 +162,17 @@ class StringInsertOp(Op):
     def is_string_transform(self):
         return True
         
-    def string_insert_transform(self, op):
+    def string_insert_transform(self, op, hazards):
         if self.t_path != op.t_path:
             return
-
-        if self.t_offset >= op.t_offset:
+        past_t_offset = op.t_offset
+        for hazard in hazards:
+            offset_shift = hazard.conflict_op_t_val - hazard.get_delete_overlap_range_size()
+            past_t_offset -= offset_shift
+        if self.t_offset >= past_t_offset:
             self.t_offset += len(op.t_val)
 
-    def string_delete_transform(self, op):
+    def string_delete_transform(self, op, hazards):
         """
         Transform this opperation when a previously unknown opperation
         did a string deletion.
@@ -187,10 +180,17 @@ class StringInsertOp(Op):
         if self.t_path != op.t_path:
             return
 
-        if self.t_offset >= op.t_offset + op.t_val:
-            self.t_offset -= op.t_val
-        elif self.t_offset > op.t_offset:
-            self.t_offset = op.t_offset
+        past_t_val = op.t_val
+        past_t_offset = op.t_offset
+        for hazard in hazards:
+            if hazard.conflict_op_t_offset < hazard.base_op_t_offset:
+                past_t_offset += hazard.get_delete_overlap_range_size()
+            past_t_val -= hazard.get_delete_overlap_range_size()
+
+        if self.t_offset >= past_t_offset + past_t_val:
+            self.t_offset -= past_t_val
+        elif self.t_offset > past_t_offset:
+            self.t_offset = past_t_offset
             self.t_val = ''
  
         
@@ -201,7 +201,7 @@ class StringDeleteOp(Op):
     def is_string_delete(self):
         return True
     
-    def string_insert_transform(self, op):
+    def string_insert_transform(self, op, hazards):
         if self.t_path != op.t_path:
             return
 
@@ -214,7 +214,7 @@ class StringDeleteOp(Op):
         elif self.t_offset >= op.t_offset:
             self.t_offset += len(op.t_val)
 
-    def string_delete_transform(self, op):
+    def string_delete_transform(self, op, hazards):
         """
         Transform this opperation when a previously unknown opperation
         did a string deletion.

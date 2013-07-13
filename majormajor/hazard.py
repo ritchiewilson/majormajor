@@ -35,6 +35,11 @@ class Hazard:
 
     def calculate_hazard_info(self):
         if self.base_op.is_string_delete() and self.conflict_op.is_string_delete():
+            self.base_op_t_offset = self.base_op.t_offset
+            self.base_op_t_val = self.base_op.t_val
+            self.conflict_op_t_offset = self.conflict_op.t_offset
+            self.conflict_op_t_val = self.conflict_op.t_val
+            
             bre = self.base_op.t_offset + self.base_op.t_val # base range end
             cre = self.conflict_op.t_offset + self.conflict_op.t_val # conflict op range end
             self.delete_overlap_range_end = min(bre, cre)
@@ -42,6 +47,8 @@ class Hazard:
             brs = self.base_op.t_offset  # base range start
             crs = self.conflict_op.t_offset  # conflict op range start
             self.delete_overlap_range_start = max(brs, crs)
+
+            self.min_offset_for_hazard_application = self.conflict_op.t_offset
 
     def get_delete_overlap_end(self):
         return self.delete_overlap_range_end
@@ -57,6 +64,9 @@ class Hazard:
 
     def get_delete_overlap_range_size(self):
         return self.delete_overlap_range_end - self.delete_overlap_range_start
+
+    def get_min_offset_for_hazard_application(self):
+        return self.min_offset_for_hazard_application
 
     def is_string_delete_range_overlap_hazard(self):
         return self.base_op.t_path == self.conflict_op.t_path and  \
