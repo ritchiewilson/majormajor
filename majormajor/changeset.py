@@ -123,8 +123,6 @@ class Changeset:
         return ancestors
         
     def has_ancestor(self, ancestor):
-        if len(self.parents) == 0:
-            return False
         if ancestor in self.parents:
             return True
         if self._is_ancestor_cache and self.ancestor_cache != None:
