@@ -109,7 +109,7 @@ class Changeset:
 
         # just return the cache if able
         if self._is_ancestor_cache and self._has_valid_ancestor_cache:
-            return self.ancestor_cache.copy()
+            return self.ancestor_cache
 
         # otherwise, recursively find all ancestors
         ancestors = set(self.parents)

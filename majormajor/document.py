@@ -404,15 +404,17 @@ class Document:
             cs = self.ordered_changesets[i]
             hazards = self.get_hazards_for_cs(cs, i)
             new_hazards = cs.ot(hazards)
-            self.add_new_hazards(new_hazards)
+            if new_hazards:
+                self.add_new_hazards(new_hazards)
             i += 1
 
     def add_new_hazards(self, new_hazards):
+        ocs = {cs: i for i, cs in enumerate(self.ordered_changesets)}
         self.hazards.extend(new_hazards)
         self.hazards.sort(key=lambda h: h.get_conflict_op_index())
-        self.hazards.sort(key=lambda h: self.ordered_changesets.index(h.conflict_cs))
+        self.hazards.sort(key=lambda h: ocs[h.conflict_cs])
         self.hazards.sort(key=lambda h: h.get_base_op_index())
-        self.hazards.sort(key=lambda h: self.ordered_changesets.index(h.base_cs))
+        self.hazards.sort(key=lambda h: ocs[h.base_cs])
 
     def remove_old_hazards(self, index=0):
         css = set(self.ordered_changesets[index:])
