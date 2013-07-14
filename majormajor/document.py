@@ -399,13 +399,25 @@ class Document:
         start onwards.
         """
         i = max(start, 1)
+        # any hazards past start point are not invalid.
         self.remove_old_hazards(i)
+
+        # when a cs has one child, and no new hazards were produced,
+        # the child will have the same list of hazards. Don't recalc.
+        recalculate_hazards_for_cs = True
+        hazards = []
         while i < len(self.ordered_changesets):
             cs = self.ordered_changesets[i]
-            hazards = self.get_hazards_for_cs(cs, i)
+            if recalculate_hazards_for_cs:
+                hazards = self.get_hazards_for_cs(cs, i)
             new_hazards = cs.ot(hazards)
             if new_hazards:
                 self.add_new_hazards(new_hazards)
+                recalculate_hazards_for_cs = True
+            elif len(cs.get_children()) == 1:
+                recalculate_hazards_for_cs = False
+            else:
+                recalculate_hazards_for_cs = True
             i += 1
 
     def add_new_hazards(self, new_hazards):
