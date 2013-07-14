@@ -83,6 +83,9 @@ class Document:
 
     def get_missing_changeset_ids(self):
         return self.missing_changesets.copy()
+
+    def get_send_queue(self):
+        return self.send_queue[:]
     
     def clear_send_queue(self):
         self.send_queue = []
@@ -225,6 +228,7 @@ class Document:
         # clean out old dependencies, since this should be the only
         # one now
         self.dependencies = [cs]
+        self.send_queue.append(cs)
         # randomly select if if this changeset should be a cache
         if random.random() < 0.1:
             cs.set_as_snapshot_cache(True)
@@ -280,7 +284,6 @@ class Document:
         # close the currently open changeset and get it ready for sending
         current_cs = self.close_changeset()
         if current_cs:
-            self.send_queue.append(current_cs)
             response['closed_changeset'] = current_cs
 
         # save theindex at which the changeset was inserted.
@@ -326,16 +329,17 @@ class Document:
         Go through the list of pending changesets and try again to
         incorporatet them into this document. As long as the list of
         pending changests shrinks, it loops through again.
-
-        TODO: This is so crazy inneficient. This'll blow up.
         """
-        l = -1
+        l = -1 # flag for when looping is done
+        index = len(self.ordered_changesets) # keep track of lowest index for start point for ot
         while not l == len(self.pending_new_changesets):
             l = len(self.pending_new_changesets)
             for cs in iter(self.pending_new_changesets):
                 if self.has_needed_dependencies(cs):
-                    self.activate_changeset_in_document(cs)
+                    i = self.activate_changeset_in_document(cs)
+                    index = min(i, index)
                     self.pending_new_changesets.remove(cs)
+        return index
 
         
     def receive_snapshot(self, m):

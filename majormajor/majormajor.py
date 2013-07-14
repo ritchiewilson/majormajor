@@ -91,13 +91,13 @@ class MajorMajor:
         
     def close_open_changesets(self):
         for doc in self.documents:
-            for cs in doc.send_queue:
-                self.send_changeset(cs)
-            doc.clear_send_queue()
             oc = doc.get_open_changeset()
             if oc and not oc.is_empty():
-                cs = doc.close_changeset()
-                self.send_changeset(cs)
+                doc.close_changeset()
+            css = doc.get_send_queue()
+            if css:
+                self.send_changesets(doc=doc, css=css)
+                doc.clear_send_queue()
         return True
 
     def new_document(self, doc_id=None, user=None, snapshot=None):
@@ -395,17 +395,21 @@ class MajorMajor:
         self.broadcast(msg)
         return msg
 
-    def send_changesets(self, m):
+    def send_changesets(self, m=None, doc=None, css=None):
         msg = {}
-        doc = self.get_document_by_id(m['doc_id'])
+        doc = self.get_document_by_id(m['doc_id']) if not doc else doc
         if not doc:
             return
-        css = [doc.get_changeset_by_id(cs).to_dict() for cs in m['cs_ids'] \
-               if doc.knows_changeset(cs)]
+        cs_data = None
+        if css:
+            css_data = [cs.to_dict() for cs in css] 
+        else:
+            css_data = [doc.get_changeset_by_id(cs).to_dict() for cs in m['cs_ids'] \
+                        if doc.knows_changeset(cs)]
         msg = {"action":"send_changesets",
                "user":self.default_user,
                "doc_id":doc.get_id(),
-               'css':css}
+               'css':css_data}
         self.broadcast(msg)
         return msg
         
@@ -442,7 +446,7 @@ class MajorMajor:
                'missing_dep_ids':[]}
         # For testing. If this flag is set, drop changesets at random
         # to simulate network problems.
-        if self.drop_random_css and random.random() < 0.5:
+        if self.drop_random_css and random.random() < 2:
             return msg
         if doc_id == None:
             doc_id = m['doc_id']
