@@ -22,6 +22,7 @@ from majormajor.changeset import Changeset
 class TestDocumentUnaccountedChangesets:
     def test_linear(self):
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
         cs0 = Changeset(doc.get_id(), "dummyuser", [root])
         doc.add_to_known_changesets(cs0)
@@ -60,6 +61,7 @@ class TestDocumentUnaccountedChangesets:
              -- C --
         """
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
         B = Changeset(doc.get_id(), "user0", [root])
         B.set_id('b')
@@ -109,6 +111,7 @@ class TestDocumentUnaccountedChangesets:
         Both F and E depend on D and C
         """
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
         A = Changeset(doc.get_id(), "user0", [root])
         A.set_id('a')
@@ -204,6 +207,7 @@ class TestDocumentUnaccountedChangesets:
         """
         
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
         A = Changeset(doc.get_id(), "user0", [root])
         A.set_id('A')

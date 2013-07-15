@@ -31,6 +31,7 @@ class TestChangesetOT:
         full, side by side.
         """
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
         # create a common parrent for two divergent branches
@@ -107,6 +108,7 @@ class TestChangesetOT:
         full, side by side.
         """
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
         # create a common parrent for two divergent branches

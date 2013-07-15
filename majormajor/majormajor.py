@@ -41,11 +41,14 @@ class MajorMajor:
         self.connections = []
         self.default_user = str(uuid.uuid4())
         self.requested_changesets = {}
-        
-        self.event_loop = event_loop
+
+        # When used as a plugin, this should be tied into an event
+        # loop. Currently GObject is hardcoded in. For testing, there
+        # is no event loop so all actions happen immediately.
+        self.HAS_EVENT_LOOP = event_loop
         if event_loop:
             GObject.timeout_add(20, self.test_thousands_ops)
-            GObject.timeout_add(500, self.close_open_changesets)
+            GObject.timeout_add(500, self.pull_from_pending_lists)
             GObject.timeout_add(2000, self._retry_request_changesets)
             GObject.timeout_add(5000, self._sync_documents)
         self.big_insert = False
@@ -89,17 +92,20 @@ class MajorMajor:
         self.connections.append(c)
         
         
-    def close_open_changesets(self):
+    def pull_from_pending_lists(self):
         for doc in self.documents:
-            oc = doc.get_open_changeset()
-            if oc and not oc.is_empty():
-                doc.close_changeset()
+            old_state = copy.deepcopy(doc.get_snapshot())
+            doc.pull_from_pending_list()
+            opcodes = doc.get_diff_opcode(old_state)
+            for callback in self.signal_callbacks['receive-changeset']:
+                callback(opcodes)
+
             css = doc.get_send_queue()
             if css:
                 self.send_changesets(doc=doc, css=css)
                 doc.clear_send_queue()
         return True
-
+            
     def new_document(self, doc_id=None, user=None, snapshot=None):
         """
         Create a new Document to add to the list of open
@@ -110,6 +116,8 @@ class MajorMajor:
         if user == None:
             user = self.default_user
         d = Document(doc_id, user, snapshot)
+        if not self.HAS_EVENT_LOOP:
+            d.HAS_EVENT_LOOP = False
         self.documents.append(d)
         return d
 
@@ -178,6 +186,7 @@ class MajorMajor:
         msg = {}
         for doc_id, css in self.requested_changesets.items():
             doc = self.get_document_by_id(doc_id)
+            if not doc: continue
             missing_changesets = doc.get_missing_changeset_ids()
             request_list = []
             doc_dict = self.requested_changesets[doc_id]
@@ -191,7 +200,7 @@ class MajorMajor:
                 else:
                     doc_dict[cs_id]['countdown'] -= 1
             msg = self.request_changesets(doc_id, request_list)
-        if self.event_loop:
+        if self.HAS_EVENT_LOOP:
             return True
         return msg
 
@@ -199,7 +208,7 @@ class MajorMajor:
         msg = {}
         for doc in self.documents:
             self._sync_document(doc_id=doc.get_id())
-        if self.event_loop:
+        if self.HAS_EVENT_LOOP:
             return True
         return msg
 
@@ -222,11 +231,12 @@ class MajorMajor:
             # changesets.
 
             r_css = {'css':msg['send_css']}
-            response = self.receive_changesets(r_css, doc_id=doc_id)
+            self.receive_changesets(r_css, doc_id=doc_id)
+            missing_cs_ids = self.update_missing_changesets(doc)
 
             # add to that any other missing deps
             _request_css, _send_css = doc.get_sync_status(msg['deps'])
-            request_css = list(set(response['missing_dep_ids'] + _request_css))
+            request_css = list(set(missing_cs_ids + _request_css))
 
             # get the rest of changesets to send
             send_local_dep_css = \
@@ -454,25 +464,26 @@ class MajorMajor:
         if not doc:
             return
 
-        msg =  doc.receive_changesets(m['css'])
-        dep_ids = msg['missing_dep_ids']
-        if dep_ids:
-                self.add_to_requested_changesets(doc.get_id(), dep_ids)
-                self.request_changesets(doc.get_id(), dep_ids)
+        doc.receive_changesets(m['css'])
 
-        if msg['one_inserted']:
-            opcodes = doc.get_diff_opcode(msg['old_state'])
-            for callback in self.signal_callbacks['receive-changeset']:
-                callback(opcodes)
+        cs_ids = self.update_missing_changesets(doc)
+        msg = self.request_changesets(doc.get_id(), cs_ids)
+
+        if not self.HAS_EVENT_LOOP:
+            self.pull_from_pending_lists()
+        
         return msg
             
-    def add_to_requested_changesets(self, doc_id, dep_ids):
-        if not doc_id in self.requested_changesets:
-            self.requested_changesets[doc_id] = {}
-        for dep_id in dep_ids:
-            if not dep_id in self.requested_changesets[doc_id]:
-                self.requested_changesets[doc_id][dep_id] = {'countdown':0, \
-                                                             'next_start': 1}
+    def update_missing_changesets(self, doc):
+        if not doc in self.requested_changesets:
+            self.requested_changesets[doc] = {}
+        cs_ids = [cs_id for cs_id in doc.get_missing_changeset_ids() \
+                  if not cs_id in self.requested_changesets[doc]]
+        for cs_id in cs_ids:
+            self.requested_changesets[doc][cs_id] = {'countdown':0, \
+                                                     'next_start': 1}
+        return cs_ids
+        
     signal_callbacks = {
         'receive-changeset' : [],
         'receive-snapshot' : [],

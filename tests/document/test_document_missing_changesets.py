@@ -23,6 +23,7 @@ class TestDocumentMissingChangesets:
 
     def test_missing_changesets(self):
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         assert doc.missing_changesets == set([])
         assert doc.pending_new_changesets == []
         

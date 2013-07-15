@@ -24,13 +24,15 @@ class TestDocumentHelpers:
 
     def setup_method(self, method):
         self.doc0 = Document(snapshot={})
+        self.doc0.HAS_EVENT_LOOP = False
 
         s1 = {'first': 'some string',
               'second': {'third':'more string',
                          'fourth':{'numb':55}},
               'fifth': [55,66,{'sixth': 'deep string'}, 'rw']}
         self.doc1 = Document(snapshot=s1)
-
+        self.doc1.HAS_EVENT_LOOP = False
+        
         s2 = [{'name':'value'},
               [1,2,3,4],
               'normal, ol string',
@@ -39,7 +41,9 @@ class TestDocumentHelpers:
               None,
               42]
         self.doc2 = Document(snapshot=s2)
+        self.doc2.HAS_EVENT_LOOP = False
         self.doc3 = Document(snapshot = "ABCDEFG")
+        self.doc3.HAS_EVENT_LOOP = False
         
     def test_get_id(self):
         doc = Document('abc456')

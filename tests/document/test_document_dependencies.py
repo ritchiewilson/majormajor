@@ -25,6 +25,7 @@ class TestDocumentDependencyTreeToList:
 
     def test_initial_dependency(self):
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         assert doc.get_open_changeset() == None
         assert doc.get_ordered_changesets() == [doc.get_root_changeset()]
 
@@ -32,6 +33,7 @@ class TestDocumentDependencyTreeToList:
 
     def test_sequential_changeset(self):
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
         cs0 = Changeset(doc.get_id(), "dummyuser", [root])
         rid = root.get_id()
@@ -64,6 +66,7 @@ class TestDocumentDependencyTreeToList:
              -- C --
         """
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
         B = Changeset(doc.get_id(), "user0", [root])
         B.set_id('b')
@@ -108,6 +111,7 @@ class TestDocumentDependencyTreeToList:
         Both F and E depend on D and C
         """
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
         A = Changeset(doc.get_id(), "user0", [root])
         A.set_id('a')
@@ -168,6 +172,7 @@ class TestDocumentDependencyTreeToList:
         """
         
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
         A = Changeset(doc.get_id(), "user0", [root])
         A.set_id('A')
@@ -255,6 +260,7 @@ class TestDocumentDependencyTreeToList:
         """
         NUMBER_OF_CHANGESETS = 500
         doc = Document(snapshot='')
+        doc.HAS_EVENT_LOOP = False
         assert doc.get_ordered_changesets() == doc.tree_to_list()
         i = 1
         while i < NUMBER_OF_CHANGESETS:

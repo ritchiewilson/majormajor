@@ -37,15 +37,12 @@ class Document:
         if user == None:
             user = str(uuid.uuid4())
         self.user = user
-        # some initial values
-        #self.changesets = []
         self.ordered_changesets = []
         self.ordered_changesets_set_cache = set([])
         self.all_known_changesets = {}
         self.missing_changesets = set([])
         self.send_queue = []
         self.pending_new_changesets = []
-        self.pending_historical_changesets = []
         self.open_changeset = None
         self.snapshot = {}
         self.root_changeset = None
@@ -55,6 +52,10 @@ class Document:
         if not snapshot == None:
             self.set_initial_snapshot(snapshot)
         self.dependencies = [self.root_changeset]
+        #  With an event loop, many actions happen on a timer. For
+        #  testing, there is no event loop, so actions happen
+        #  immediately.
+        self.HAS_EVENT_LOOP = True
         
 
     def get_id(self):
@@ -129,19 +130,6 @@ class Document:
         request_css = [dep for dep in remote_deps if not self.knows_changeset(dep)]
         send_css = [cs for cs in self.dependencies if not cs.get_id() in remote_deps]
         return request_css, send_css
-
-    def add_to_pending_new_changesets(self, cs):
-        """
-        Add the given changeset to the pending list, and add it's missing
-        dependencies to the missing changesets list.
-
-        Returns the ids of the missing parent changesets.
-        """
-        self.pending_new_changesets.append(cs)
-        dep_ids = self.get_missing_dependency_ids(cs)
-        self.missing_changesets.update(dep_ids)
-        return dep_ids
-
 
     def set_initial_snapshot(self, s):
         """
@@ -237,19 +225,9 @@ class Document:
         return cs
 
     def receive_changesets(self, css):
-        response = {'one_inserted' : False,
-                    'missing_dep_ids': [],
-                    'old_state': copy.deepcopy(self.get_snapshot())}
-
         for cs in css:
-            r = self.receive_changeset(cs)
-            status = r['status']
-            if status == 'success':
-                response['one_inserted'] = True
-            elif status == 'missing_deps':
-                response['missing_dep_ids'] += r['missing_dep_ids']
-
-        return response
+            self.receive_changeset(cs)
+        return True
         
 
     def receive_changeset(self, cs):
@@ -261,41 +239,23 @@ class Document:
             cs = build_changeset_from_dict(cs, self)
 
         if self.knows_changeset(cs.get_id()):
-            return {'status':'known_changeset'}
+            return False
 
         self.add_to_known_changesets(cs)
 
         if cs.get_id() in self.missing_changesets:
             self.missing_changesets.remove(cs.get_id())
 
-        # if this changeset cannot be used yet, add it to pending
-        # list, then return status with needed changeset ids
-        if not self.has_needed_dependencies(cs):
-            dep_ids = self.add_to_pending_new_changesets(cs)
-            return {'status':'missing_deps', \
-                    'missing_dep_ids': dep_ids}
+        self.pending_new_changesets.append(cs)
+        dep_ids = self.get_missing_dependency_ids(cs)
+        self.missing_changesets.update(dep_ids)
 
-        # from this point on, the changeset can be received, so start
-        # building the response status
-        response = {'status': 'success',
-                    'old_state': copy.deepcopy(self.get_snapshot()),
-                    'closed_changeset':False }
-        
-        # close the currently open changeset and get it ready for sending
-        current_cs = self.close_changeset()
-        if current_cs:
-            response['closed_changeset'] = current_cs
+        if self.HAS_EVENT_LOOP:
+            return True
 
-        # save theindex at which the changeset was inserted.
-        index = self.activate_changeset_in_document(cs)
+        was_inserted = self.pull_from_pending_list()
+        return was_inserted
 
-        # check the pending list for anything that can be inserted.
-        self.pull_from_pending_list()            
-
-        self.ot(index-1)
-        self.rebuild_snapshot()
-
-        return response
 
     def activate_changeset_in_document(self, cs):
         """
@@ -330,8 +290,11 @@ class Document:
         incorporatet them into this document. As long as the list of
         pending changests shrinks, it loops through again.
         """
+        self.close_changeset()
+        # keep track of lowest index for start point for ot
+        index = len(self.ordered_changesets)
+        one_inserted = False
         l = -1 # flag for when looping is done
-        index = len(self.ordered_changesets) # keep track of lowest index for start point for ot
         while not l == len(self.pending_new_changesets):
             l = len(self.pending_new_changesets)
             for cs in iter(self.pending_new_changesets):
@@ -339,7 +302,13 @@ class Document:
                     i = self.activate_changeset_in_document(cs)
                     index = min(i, index)
                     self.pending_new_changesets.remove(cs)
-        return index
+                    one_inserted = True
+        if not one_inserted:
+            return False
+
+        self.ot(index-1)
+        self.rebuild_snapshot()
+        return True
 
         
     def receive_snapshot(self, m):
