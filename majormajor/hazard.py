@@ -48,8 +48,16 @@ class Hazard:
             crs = self.conflict_op.t_offset  # conflict op range start
             self.delete_overlap_range_start = max(brs, crs)
 
+            self.delete_overlap_range_size = min(bre, cre) - max(brs,crs)
+
             self.min_offset_for_hazard_application = self.conflict_op.t_offset
 
+            self.string_insert_offset_shift = self.conflict_op_t_val - \
+                                            self.get_delete_overlap_range_size()
+
+    def get_string_insert_offset_shift(self):
+        return self.string_insert_offset_shift
+    
     def get_delete_overlap_end(self):
         return self.delete_overlap_range_end
 
@@ -63,7 +71,7 @@ class Hazard:
         return self.conflict_op_index
 
     def get_delete_overlap_range_size(self):
-        return self.delete_overlap_range_end - self.delete_overlap_range_start
+        return self.delete_overlap_range_size
 
     def get_min_offset_for_hazard_application(self):
         return self.min_offset_for_hazard_application

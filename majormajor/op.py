@@ -167,8 +167,8 @@ class StringInsertOp(Op):
             return
         past_t_offset = op.t_offset
         for hazard in hazards:
-            offset_shift = hazard.conflict_op_t_val - hazard.get_delete_overlap_range_size()
-            past_t_offset -= offset_shift
+            past_t_offset -= hazard.get_string_insert_offset_shift()
+        
         if self.t_offset >= past_t_offset:
             self.t_offset += len(op.t_val)
 
