@@ -231,27 +231,44 @@ class TextViewWindow(Gtk.Window):
         radio_wrapword.connect("toggled", self.on_wrap_toggled, Gtk.WrapMode.WORD)
 
     def on_save_clicked(self, widget):
+        #self.document.ot()
+        #self.document.rebuild_snapshot()
         import random
         n = "".join([random.choice("abcdef") for x in range(3)])
         n = "buffer-" + n + ".txt"
         f = open(n, 'w')
-        start = self.textbuffer.get_start_iter()
-        end = self.textbuffer.get_end_iter()
-        f.write(self.textbuffer.get_text(start, end,True))
+        #start = self.textbuffer.get_start_iter()
+        #end = self.textbuffer.get_end_iter()
+        #f.write(self.textbuffer.get_text(start, end,True))
+        f.write(self.document.get_snapshot())
         ol = self.document.get_ordered_changesets()
         for cs in ol:
-            f.write(cs.get_id()[:8])
-            #if cs.user == self.majormajor.default_user:
-            #    f.write("  <---- local")
+            f.write("\nCS ID: "+cs.get_id()[:8]+'\n')
+            p_ids = [parent.get_id() for parent in cs.get_parents()]
+            p_ids.sort()
+            f.write("  PARETNS, "+", ".join(p_ids))
+            f.write("\nOPS")
+            for op in cs.get_ops():
+                f.write("     TOffset " + str(op.t_offset))
+                f.write("     Offset " + str(op.offset))
+                f.write("     TVal "+str(op.t_val))
+                f.write("     Val "+str(op.val))
+                f.write("\n")
             f.write("\n")
             for ucs in cs.get_unaccounted_changesets():
                 f.write("    " + ucs.get_id()[:8])
                 #if ucs.user == self.majormajor.default_user:
                 #    f.write("  <---- local")
                 f.write("\n")
+        f.write("\n\nHazzards")
+        for hazard in self.document.hazards:
+            f.write('hazard base' + str(hazard.base_cs) + '\n')
+            f.write('hazard conf' + str(hazard.conflict_cs) + '\n')
+            f.write('hazard over' + str(hazard.get_string_insert_offset_shift()) + '\n')
+            f.write('hazard size' + str(hazard.get_delete_overlap_range_size()) + '\n')
         f.close()
         print "saved"
-
+        
 
     def on_random_clicked(self, widget):
         self.majormajor.big_insert = not self.majormajor.big_insert

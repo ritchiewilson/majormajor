@@ -20,6 +20,7 @@ import random
 import string
 import uuid
 import copy
+from datetime import datetime
 from changeset import Changeset
 from op import Op
 from utils import build_changeset_from_dict
@@ -56,7 +57,7 @@ class Document:
         #  testing, there is no event loop, so actions happen
         #  immediately.
         self.HAS_EVENT_LOOP = True
-        
+        self.time_of_last_received_cs = datetime.now()
 
     def get_id(self):
         return self.id_
@@ -105,6 +106,9 @@ class Document:
 
     def get_open_changeset(self):
         return self.open_changeset
+
+    def get_time_of_last_received_cs(self):
+        return self.time_of_last_received_cs
 
     def get_changesets_in_ranges(self, start_ids, end_ids):
         cs_in_range = []            
@@ -205,7 +209,7 @@ class Document:
             self.open_changeset == None
             
         if self.open_changeset == None:
-            return
+            return False
 
         cs = self.open_changeset
         self.add_to_known_changesets(cs)
@@ -375,8 +379,9 @@ class Document:
         # any hazards past start point are not invalid.
         self.remove_old_hazards(i)
 
-        # when a cs has one child, and no new hazards were produced,
-        # the child will have the same list of hazards. Don't recalc.
+        # when a cs has one child, the child has one parent, and no
+        # new hazards were produced, the child will have the same list
+        # of hazards. Don't recalc.
         recalculate_hazards_for_cs = True
         hazards = []
         while i < len(self.ordered_changesets):
@@ -387,7 +392,8 @@ class Document:
             if new_hazards:
                 self.add_new_hazards(new_hazards)
                 recalculate_hazards_for_cs = True
-            elif len(cs.get_children()) == 1:
+            elif len(cs.get_children()) == 1 and \
+                 len(cs.get_children()[0].get_parents()) == 1:
                 recalculate_hazards_for_cs = False
             else:
                 recalculate_hazards_for_cs = True

@@ -22,7 +22,7 @@ import socket, copy, difflib
 import json
 import sys
 import uuid
-import datetime
+from datetime import datetime
 import random
 
 from gi.repository import GObject
@@ -75,8 +75,6 @@ class MajorMajor:
                 doc.add_local_op(Op('sd',[],offset=0,val=n))
                 
             cs = doc.close_changeset()
-            self.send_changeset(cs)
-            # So the status was 'success'
             opcodes = doc.get_diff_opcode(old_state)
             for callback in self.signal_callbacks['receive-changeset']:
                 callback(opcodes)
@@ -205,8 +203,16 @@ class MajorMajor:
         return msg
 
     def _sync_documents(self):
+        """
+        This is periodically called on a timer to check that documents are
+        synced. If the Document has just recently received a new
+        changeset, don't try to sync since it is probably already in
+        process.
+        """
         msg = {}
         for doc in self.documents:
+            time_diff = datetime.now() - doc.get_time_of_last_received_cs()
+            if time_diff.seconds < 5: continue
             self._sync_document(doc_id=doc.get_id())
         if self.HAS_EVENT_LOOP:
             return True
@@ -456,7 +462,7 @@ class MajorMajor:
                'missing_dep_ids':[]}
         # For testing. If this flag is set, drop changesets at random
         # to simulate network problems.
-        if self.drop_random_css and random.random() < 2:
+        if self.drop_random_css and random.random() < 1:
             return msg
         if doc_id == None:
             doc_id = m['doc_id']
@@ -465,6 +471,8 @@ class MajorMajor:
             return
 
         doc.receive_changesets(m['css'])
+
+        doc.time_of_last_received_cs = datetime.now()
 
         cs_ids = self.update_missing_changesets(doc)
         msg = self.request_changesets(doc.get_id(), cs_ids)
