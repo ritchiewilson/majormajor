@@ -222,12 +222,19 @@ class StringDeleteOp(Op):
         if self.t_path != op.t_path:
             return
 
+        past_t_val = op.t_val
+        past_t_offset = op.t_offset
+        for hazard in hazards:
+            if past_t_offset >= hazard.get_delete_overlap_start():
+                past_t_offset -= hazard.get_delete_overlap_range_size()
+            past_t_val -= hazard.get_delete_overlap_range_size()
+
         hazard = False
             
         srs = self.t_offset # self range start
         sre = self.t_offset + self.t_val # self range end
-        oprs = op.t_offset # prev op range start
-        opre = op.t_offset + op.t_val # prev op range end
+        oprs = past_t_offset # prev op range start
+        opre = past_t_offset + past_t_val # prev op range end
         # there are six ways two delete ranges can overlap and
         # each one is a different case.
 
@@ -240,34 +247,34 @@ class StringDeleteOp(Op):
         #   |-- prev op --|
         #                   |-- self --|
         elif srs >= opre:
-            self.t_offset -= op.t_val
+            self.t_offset -= past_t_val
         # case 3
         #   |-- prev op --|
         #           |-- self --|
         elif srs >= oprs and sre > opre:
             hazard = Hazard(op, self)
-            self.t_val += (self.t_offset - (op.t_offset + op.t_val))
+            self.t_val += (self.t_offset - (past_t_offset + past_t_val))
             self.t_val = max(0, self.t_val)
-            self.t_offset = op.t_offset
+            self.t_offset = past_t_offset
         # case 4
         #   |--- prev op ---|
         #     |-- self --|
         elif srs >= oprs and sre <= opre:
             hazard = Hazard(op, self)
-            self.t_offset = op.t_offset
+            self.t_offset = past_t_offset
             self.t_val = 0
         # case 5
         #     |-- prev op --|
         #   |----- self ------|
         elif sre >= opre:
             hazard = Hazard(op, self)
-            self.t_val -= op.t_val
+            self.t_val -= past_t_val
         # case 6
         #      |-- prev op --|
         #   |-- self --|
         else:
             hazard = Hazard(op, self)
-            self.t_val = op.t_offset - self.t_offset
+            self.t_val = past_t_offset - self.t_offset
 
         return hazard
 
