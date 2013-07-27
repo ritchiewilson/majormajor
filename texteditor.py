@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from gi.repository import Gtk, Pango
-from majormajor import MajorMajor
-from op import Op
+from majormajor.majormajor import MajorMajor
+from majormajor.ops.op import Op
 import sys
 
 
