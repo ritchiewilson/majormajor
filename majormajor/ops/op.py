@@ -105,15 +105,15 @@ class Op(object):
                 new_hazards.append(hazard)
         return new_hazards
 
-    def shift_past_op_by_hazards(self, op, hazards):
-        p = op.t_path
-        o = op.t_offset
-        v = op.t_val
-        if op.is_string_insert():
-            p, o, v = self.shift_past_string_insert_by_hazards(op, hazards)
-        if op.is_string_delete():
-            p, o, v = self.shift_past_string_delete_by_hazards(op, hazards)
-        return p, o, v
+
+    def get_properties_shifted_by_hazards(self, hazards):
+        """
+        Calculate how this op should be handled by a future op, accounting
+        for any hazards that need to be applied. This is overriden by
+        each op. By default, there are no hazards, so just return these
+        transformed properties.
+        """
+        return self.t_path, self.t_offset, self.t_val
 
         
     def set_transform(self, op, hazards):

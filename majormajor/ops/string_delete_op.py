@@ -19,18 +19,32 @@ from ..hazards.hazard import Hazard
 from string_transform_op import StringTransformOp
         
 class StringDeleteOp(StringTransformOp):
-    def is_string_transform(self):
-        return True
-
     def is_string_delete(self):
         return True
+
+    def get_properties_shifted_by_hazards(self, hazards):
+        """
+        Calculate how this op should be handled by a future op, accounting
+        for any hazards that need to be applied. If this op's offset
+        is further in the text than the hazard, then this offset is
+        off by the size of hazard. If this op is the base of the
+        hazard, then it is telling a future op to delete too much.
+        """
+        past_t_val = self.t_val
+        past_t_offset = self.t_offset
+        for hazard in hazards:
+            if past_t_offset > hazard.get_min_offset_for_hazard_application():
+                past_t_offset -= hazard.get_delete_overlap_range_size()
+            if hazard.base_op == self:
+                past_t_val -= hazard.get_delete_overlap_range_size()
+        return self.t_path, past_t_offset, past_t_val
     
     def string_insert_transform(self, op, hazards):
         if self.t_path != op.t_path:
             return
 
         past_t_path, past_t_offset, past_t_val \
-            = self.shift_past_op_by_hazards(op, hazards)
+            = op.get_properties_shifted_by_hazards(hazards)
 
         # if text was inserted into the deletion range, expand the
         # range to delete that text as well.
@@ -51,7 +65,7 @@ class StringDeleteOp(StringTransformOp):
 
 
         past_t_path, past_t_offset, past_t_val \
-            = self.shift_past_op_by_hazards(op, hazards)
+            = op.get_properties_shifted_by_hazards(hazards)
 
         hazard = False
             

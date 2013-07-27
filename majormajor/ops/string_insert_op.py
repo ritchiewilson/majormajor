@@ -20,13 +20,26 @@ from string_transform_op import StringTransformOp
 class StringInsertOp(StringTransformOp):
     def is_string_insert(self):
         return True
-        
+
+    def get_properties_shifted_by_hazards(self, hazards):
+        """
+        Calculate how this op should be handled by a future op, accounting
+        for any hazards that need to be applied. If this op's offset
+        is further in the text than the hazard, then this offset is
+        off by the size of hazard.
+        """
+        past_t_offset = self.t_offset
+        for hazard in hazards:
+            if past_t_offset >= hazard.get_min_offset_for_hazard_application():
+                past_t_offset -= hazard.get_string_insert_offset_shift()
+        return self.t_path, past_t_offset, self.t_val
+
     def string_insert_transform(self, op, hazards):
         if self.t_path != op.t_path:
             return
 
         past_t_path, past_t_offset, past_t_val \
-            = self.shift_past_op_by_hazards(op, hazards)
+            = op.get_properties_shifted_by_hazards(hazards)
         
         if self.t_offset >= past_t_offset:
             self.t_offset += len(op.t_val)
@@ -40,7 +53,7 @@ class StringInsertOp(StringTransformOp):
             return
 
         past_t_path, past_t_offset, past_t_val = \
-            self.shift_past_op_by_hazards(op, hazards)
+            op.get_properties_shifted_by_hazards(hazards)
                                                                                
         if self.t_offset >= past_t_offset + past_t_val:
             self.t_offset -= past_t_val

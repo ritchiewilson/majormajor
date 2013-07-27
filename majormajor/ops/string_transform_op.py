@@ -20,21 +20,3 @@ from op import Op
 class StringTransformOp(Op):
     def is_string_transform(self):
         return True
-
-    def shift_past_string_insert_by_hazards(self, op, hazards):
-        past_t_offset = op.t_offset
-        for hazard in hazards:
-            if past_t_offset >= hazard.get_min_offset_for_hazard_application():
-                past_t_offset -= hazard.get_string_insert_offset_shift()
-        return op.t_path, past_t_offset, op.t_val
-
-    def shift_past_string_delete_by_hazards(self, op, hazards):
-        past_t_val = op.t_val
-        past_t_offset = op.t_offset
-        for hazard in hazards:
-            if past_t_offset > hazard.get_min_offset_for_hazard_application():
-                past_t_offset -= hazard.get_delete_overlap_range_size()
-            if hazard.base_op == op:
-                past_t_val -= hazard.get_delete_overlap_range_size()
-        return op.t_path, past_t_offset, past_t_val
-        
