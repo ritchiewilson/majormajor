@@ -18,7 +18,7 @@
 import pytest
 
 from majormajor.document import Document
-from majormajor.op import Op
+from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
 

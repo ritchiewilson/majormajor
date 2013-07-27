@@ -19,9 +19,16 @@
 class Hazard:
     STRING_DELETE_RANGE_OVERLAP = 0
 
-    def __init__(self, base_op, conflict_op):
+    def __init__(self, base_op, conflict_op, shifted_base_op_offset, shifted_base_op_val):
         self.base_op = base_op
         self.conflict_op = conflict_op
+        
+        # These two variables are because we need to hold on to how
+        # the base op was applied to the conflict op, including hazard
+        # shifting.
+        self.shifted_base_op_offset = shifted_base_op_offset
+        self.shifted_base_op_val = shifted_base_op_val
+
         self.base_cs = base_op.get_changeset()
         self.conflict_cs = conflict_op.get_changeset()
         self.conflict_op_index = None
@@ -32,25 +39,26 @@ class Hazard:
             self.base_op_index = self.base_cs.get_ops().index(base_op)
         self.hazard_type = None
         self.calculate_hazard_info()
+        self.shifts_in_branches = []
 
     def calculate_hazard_info(self):
         if self.base_op.is_string_delete() and self.conflict_op.is_string_delete():
-            self.base_op_t_offset = self.base_op.t_offset
-            self.base_op_t_val = self.base_op.t_val
+            self.base_op_t_offset = self.shifted_base_op_offset
+            self.base_op_t_val = self.shifted_base_op_val
             self.conflict_op_t_offset = self.conflict_op.t_offset
             self.conflict_op_t_val = self.conflict_op.t_val
             
-            bre = self.base_op.t_offset + self.base_op.t_val # base range end
+            bre = self.base_op_t_offset + self.base_op_t_val # base range end
             cre = self.conflict_op.t_offset + self.conflict_op.t_val # conflict op range end
             self.delete_overlap_range_end = min(bre, cre)
 
-            brs = self.base_op.t_offset  # base range start
+            brs = self.base_op_t_offset  # base range start
             crs = self.conflict_op.t_offset  # conflict op range start
             self.delete_overlap_range_start = max(brs, crs)
 
             self.delete_overlap_range_size = min(bre, cre) - max(brs,crs)
 
-            self.min_offset_for_hazard_application = self.conflict_op.t_offset
+            self.min_offset_for_hazard_application = self.conflict_op_t_offset
 
             self.string_insert_offset_shift = self.conflict_op_t_val - \
                                             self.get_delete_overlap_range_size()
@@ -79,4 +87,3 @@ class Hazard:
     def is_string_delete_range_overlap_hazard(self):
         return self.base_op.t_path == self.conflict_op.t_path and  \
             self.base_op.is_string_delete() and self.conflict_op.is_string_delete()
-        

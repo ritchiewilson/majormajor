@@ -22,7 +22,7 @@ import uuid
 import copy
 from datetime import datetime
 from changeset import Changeset
-from op import Op
+from ops.op import Op
 from utils import build_changeset_from_dict
 
 class Document:
@@ -310,7 +310,7 @@ class Document:
         if not one_inserted:
             return False
 
-        self.ot(index-1)
+        self.ot(index)
         self.rebuild_snapshot()
         return True
 

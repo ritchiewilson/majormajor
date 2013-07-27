@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from majormajor.document import Document
-from majormajor.op import Op
+from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
 class TestDocumentMissingChangesets:

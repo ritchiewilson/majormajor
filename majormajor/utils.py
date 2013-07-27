@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from op import Op
+from ops.op import Op
 from changeset import Changeset
 
 def build_changeset_from_dict(m, doc=None):

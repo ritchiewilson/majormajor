@@ -20,7 +20,9 @@ Testing operational transformation with each combination of
 possible opperations.
 """
 
-from majormajor.op import *
+from majormajor.ops.op import Op, SetOp
+from majormajor.ops.string_insert_op import StringInsertOp
+from majormajor.ops.string_delete_op import StringDeleteOp
 from majormajor.changeset import Changeset
 
 class TestOT:

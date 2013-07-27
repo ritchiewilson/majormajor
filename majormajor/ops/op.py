@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from hazard import Hazard
 
 class Op(object):
     """
@@ -106,6 +105,16 @@ class Op(object):
                 new_hazards.append(hazard)
         return new_hazards
 
+    def shift_past_op_by_hazards(self, op, hazards):
+        p = op.t_path
+        o = op.t_offset
+        v = op.t_val
+        if op.is_string_insert():
+            p, o, v = self.shift_past_string_insert_by_hazards(op, hazards)
+        if op.is_string_delete():
+            p, o, v = self.shift_past_string_delete_by_hazards(op, hazards)
+        return p, o, v
+
         
     def set_transform(self, op, hazards):
         """
@@ -145,6 +154,9 @@ class Op(object):
     def is_string_delete(self):
         return False
 
+    def is_string_insert(self):
+        return False
+
     json_opperations = {
         'set': 'set_transform',
         'bn' : 'boolean_negation',
@@ -158,126 +170,10 @@ class Op(object):
         'od' : 'object_delete'
     }
 
-class StringInsertOp(Op):
-    def is_string_transform(self):
-        return True
-        
-    def string_insert_transform(self, op, hazards):
-        if self.t_path != op.t_path:
-            return
-        past_t_offset = op.t_offset
-        for hazard in hazards:
-            past_t_offset -= hazard.get_string_insert_offset_shift()
-        
-        if self.t_offset >= past_t_offset:
-            self.t_offset += len(op.t_val)
-
-    def string_delete_transform(self, op, hazards):
-        """
-        Transform this opperation when a previously unknown opperation
-        did a string deletion.
-        """
-        if self.t_path != op.t_path:
-            return
-
-        past_t_val = op.t_val
-        past_t_offset = op.t_offset
-        for hazard in hazards:
-            if hazard.conflict_op_t_offset < hazard.base_op_t_offset:
-                past_t_offset += hazard.get_delete_overlap_range_size()
-            past_t_val -= hazard.get_delete_overlap_range_size()
-
-        if self.t_offset >= past_t_offset + past_t_val:
-            self.t_offset -= past_t_val
-        elif self.t_offset > past_t_offset:
-            self.t_offset = past_t_offset
-            self.t_val = ''
- 
-        
-class StringDeleteOp(Op):
-    def is_string_transform(self):
-        return True
-
-    def is_string_delete(self):
-        return True
     
-    def string_insert_transform(self, op, hazards):
-        if self.t_path != op.t_path:
-            return
-
-        # if text was inserted into the deletion range, expand the
-        # range to delete that text as well.
-        if self.t_offset + self.t_val > op.t_offset and self.t_offset < op.t_offset:
-            self.t_val += len(op.t_val)
-        # if the insertion comes before deletion range, shift
-        # deletion range forward
-        elif self.t_offset >= op.t_offset:
-            self.t_offset += len(op.t_val)
-
-    def string_delete_transform(self, op, hazards):
-        """
-        Transform this opperation when a previously unknown opperation
-        did a string deletion.
-        """
-        if self.t_path != op.t_path:
-            return
-
-        past_t_val = op.t_val
-        past_t_offset = op.t_offset
-        for hazard in hazards:
-            if past_t_offset >= hazard.get_delete_overlap_start():
-                past_t_offset -= hazard.get_delete_overlap_range_size()
-            past_t_val -= hazard.get_delete_overlap_range_size()
-
-        hazard = False
-            
-        srs = self.t_offset # self range start
-        sre = self.t_offset + self.t_val # self range end
-        oprs = past_t_offset # prev op range start
-        opre = past_t_offset + past_t_val # prev op range end
-        # there are six ways two delete ranges can overlap and
-        # each one is a different case.
-
-        # case 1
-        #                |-- prev op --|
-        # |-- self --|
-        if sre <= oprs:
-            pass
-        # case 2
-        #   |-- prev op --|
-        #                   |-- self --|
-        elif srs >= opre:
-            self.t_offset -= past_t_val
-        # case 3
-        #   |-- prev op --|
-        #           |-- self --|
-        elif srs >= oprs and sre > opre:
-            hazard = Hazard(op, self)
-            self.t_val += (self.t_offset - (past_t_offset + past_t_val))
-            self.t_val = max(0, self.t_val)
-            self.t_offset = past_t_offset
-        # case 4
-        #   |--- prev op ---|
-        #     |-- self --|
-        elif srs >= oprs and sre <= opre:
-            hazard = Hazard(op, self)
-            self.t_offset = past_t_offset
-            self.t_val = 0
-        # case 5
-        #     |-- prev op --|
-        #   |----- self ------|
-        elif sre >= opre:
-            hazard = Hazard(op, self)
-            self.t_val -= past_t_val
-        # case 6
-        #      |-- prev op --|
-        #   |-- self --|
-        else:
-            hazard = Hazard(op, self)
-            self.t_val = past_t_offset - self.t_offset
-
-        return hazard
 
 class SetOp(Op):
     pass
     
+from string_insert_op import StringInsertOp
+from string_delete_op import StringDeleteOp
