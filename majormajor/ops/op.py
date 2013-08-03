@@ -94,9 +94,8 @@ class Op(object):
         """
         new_hazards = []
         for i, op in enumerate(pc.ops):
-            hazards_after_conflict_point = [h for h in hazards \
-                                            if not h.base_cs == pc or \
-                                            h.get_base_op_index() <= i]
+            hazards_after_conflict_point = [h for h in hazards
+                                            if h.base_op == op]
             # then run OT, checking for new hazards
             func_name = self.json_opperations[op.action]
             transform_function = getattr(self, func_name)

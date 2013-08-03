@@ -15,7 +15,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from ..hazards.hazard import Hazard
 from string_transform_op import StringTransformOp
+
 
 class StringInsertOp(StringTransformOp):
     def is_string_insert(self):
@@ -30,8 +32,7 @@ class StringInsertOp(StringTransformOp):
         """
         past_t_offset = self.t_offset
         for hazard in hazards:
-            if past_t_offset >= hazard.get_min_offset_for_hazard_application():
-                past_t_offset -= hazard.get_string_insert_offset_shift()
+            past_t_offset += hazard.get_offset_shift()
         return self.t_path, past_t_offset, self.t_val
 
     def string_insert_transform(self, op, hazards):
@@ -40,9 +41,15 @@ class StringInsertOp(StringTransformOp):
 
         past_t_path, past_t_offset, past_t_val \
             = op.get_properties_shifted_by_hazards(hazards)
-        
+
+        hazard = False
+
         if self.t_offset >= past_t_offset:
             self.t_offset += len(op.t_val)
+        else:
+            hazard = Hazard(op, self, offset_shift=len(self.t_val))
+
+        return hazard
 
     def string_delete_transform(self, op, hazards):
         """
@@ -54,10 +61,17 @@ class StringInsertOp(StringTransformOp):
 
         past_t_path, past_t_offset, past_t_val = \
             op.get_properties_shifted_by_hazards(hazards)
-                                                                               
+
+        hazard = False
+
         if self.t_offset >= past_t_offset + past_t_val:
             self.t_offset -= past_t_val
         elif self.t_offset > past_t_offset:
             self.t_offset = past_t_offset
+            vs = len(self.t_val)
             self.t_val = ''
- 
+            hazard = Hazard(op, self, val_shift=vs)
+        else:
+            hazard = Hazard(op, self, offset_shift=len(self.t_val))
+
+        return hazard

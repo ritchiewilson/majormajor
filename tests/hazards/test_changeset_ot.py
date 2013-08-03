@@ -232,7 +232,7 @@ class TestChangesetOT:
         A0.set_id('A0')
         doc.receive_changeset(A0)
         assert doc.get_snapshot() == '01236789TARGET'
-        
+
         # delete '36'
         A1 = Changeset(doc.get_id(), 'u1', [A0])
         A1.add_op(Op('sd', [], offset=3, val=2))
@@ -268,6 +268,7 @@ class TestChangesetOT:
         B1.add_op(opB1)
         B1.set_id('B1')
         doc.receive_changeset(B1)
+
         assert doc.get_snapshot() == '0189TARGET'
         assert opB1.t_offset == 2
         assert opB1.t_val == 0
@@ -282,7 +283,6 @@ class TestChangesetOT:
         assert doc.get_snapshot() == 'TARGET'
         assert opB2.t_offset == 0
         assert opB2.t_val == 4
-
 
     def test_overlaping_deletes_then_string_insert(self):
 
@@ -379,22 +379,14 @@ class TestChangesetOT:
         B0.add_op(opB0)
         B0.set_id('1')
         doc.receive_changeset(B0)
-        for cs in doc.ordered_changesets:
-            print cs
-            print "    Parents:", [p.get_id() for p in cs.get_parents()]
-            print "    Ops:"
-            for op in cs.get_ops():
-                print "    Original:", op.offset, op.val
-                print "    Shifted :", op.t_offset, op.t_val
-
         assert doc.get_snapshot() == 'The Quick '
-        assert opB0.t_offset == 10
-        assert opB0.t_val == 5
+        assert opB0.t_offset == 7
+        assert opB0.t_val == 30
 
         B1 = Changeset(doc.get_id(), 'u2', [B0])
         opB1 = Op('si', [], offset=7, val='Brown Fox.')
         B1.add_op(opB1)
         B1.set_id('B1')
         doc.receive_changeset(B1)
-        assert doc.get_snapshot() == 'The Quick Brown Fox.'
-        assert opB1.t_offset == 10
+        assert doc.get_snapshot() == 'Brown Fox.The Quick '
+        assert opB1.t_offset == 7

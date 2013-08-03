@@ -17,60 +17,36 @@
 
 
 class Hazard:
-    STRING_DELETE_RANGE_OVERLAP = 0
+    """
+    When two branches diverge for multiple opperations, those opperations could
+    be considered to be applied to two different documents. A hazard is created
+    when one opperation is applied to a later opperation, and it is determined
+    that the prev op needs to be altered when being applied to all future ops
+    in order to have it seem to be applied to the same document. The hazard
+    only holds on to relevant data, but does no calcualtions. It holds on to
+    how or how much the past op's path, offset, and val need to be shifted in
+    order to bring it in line for a future op's opperational transformation.
 
-    def __init__(self, base_op, conflict_op, shifted_base_op_offset, shifted_base_op_val):
+    """
+    def __init__(self, base_op, conflict_op, path_shift=None,
+                 offset_shift=0, val_shift=0):
         self.base_op = base_op
         self.conflict_op = conflict_op
-        
-        # These two variables are because we need to hold on to how
-        # the base op was applied to the conflict op, including hazard
-        # shifting.
-        self.shifted_base_op_offset = shifted_base_op_offset
-        self.shifted_base_op_val = shifted_base_op_val
+        self.path_shift = path_shift
+        self.offset_shift = offset_shift
+        self.val_shift = val_shift
 
         self.base_cs = base_op.get_changeset()
         self.conflict_cs = conflict_op.get_changeset()
+
         self.conflict_op_index = None
         if self.conflict_cs:
-            self.conflict_op_index = self.conflict_cs.get_ops().index(conflict_op)
+            ops = self.conflict_cs.get_ops()
+            self.conflict_op_index = ops.index(conflict_op)
+
         self.base_op_index = None
         if self.base_cs:
             self.base_op_index = self.base_cs.get_ops().index(base_op)
-        self.hazard_type = None
-        self.calculate_hazard_info()
-        self.shifts_in_branches = []
-
-    def calculate_hazard_info(self):
-        if self.base_op.is_string_delete() and self.conflict_op.is_string_delete():
-            self.base_op_t_offset = self.shifted_base_op_offset
-            self.base_op_t_val = self.shifted_base_op_val
-            self.conflict_op_t_offset = self.conflict_op.t_offset
-            self.conflict_op_t_val = self.conflict_op.t_val
-            
-            bre = self.base_op_t_offset + self.base_op_t_val # base range end
-            cre = self.conflict_op.t_offset + self.conflict_op.t_val # conflict op range end
-            self.delete_overlap_range_end = min(bre, cre)
-
-            brs = self.base_op_t_offset  # base range start
-            crs = self.conflict_op.t_offset  # conflict op range start
-            self.delete_overlap_range_start = max(brs, crs)
-
-            self.delete_overlap_range_size = min(bre, cre) - max(brs,crs)
-
-            self.min_offset_for_hazard_application = self.conflict_op_t_offset
-
-            self.string_insert_offset_shift = self.conflict_op_t_val - \
-                                            self.get_delete_overlap_range_size()
-
-    def get_string_insert_offset_shift(self):
-        return self.string_insert_offset_shift
-    
-    def get_delete_overlap_end(self):
-        return self.delete_overlap_range_end
-
-    def get_delete_overlap_start(self):
-        return self.delete_overlap_range_start
 
     def get_conflict_op_index(self):
         return self.conflict_op_index
@@ -78,12 +54,11 @@ class Hazard:
     def get_base_op_index(self):
         return self.conflict_op_index
 
-    def get_delete_overlap_range_size(self):
-        return self.delete_overlap_range_size
+    def get_path_shift(self):
+        return self.path_shift
 
-    def get_min_offset_for_hazard_application(self):
-        return self.min_offset_for_hazard_application
+    def get_offset_shift(self):
+        return self.offset_shift
 
-    def is_string_delete_range_overlap_hazard(self):
-        return self.base_op.t_path == self.conflict_op.t_path and  \
-            self.base_op.is_string_delete() and self.conflict_op.is_string_delete()
+    def get_val_shift(self):
+        return self.val_shift

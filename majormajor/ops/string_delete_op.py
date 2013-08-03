@@ -33,12 +33,10 @@ class StringDeleteOp(StringTransformOp):
         past_t_val = self.t_val
         past_t_offset = self.t_offset
         for hazard in hazards:
-            if past_t_offset > hazard.get_min_offset_for_hazard_application():
-                past_t_offset -= hazard.get_delete_overlap_range_size()
-            if hazard.base_op == self:
-                past_t_val -= hazard.get_delete_overlap_range_size()
+            past_t_val += hazard.get_val_shift()
+            past_t_offset += hazard.get_offset_shift()
         return self.t_path, past_t_offset, past_t_val
-    
+
     def string_insert_transform(self, op, hazards):
         if self.t_path != op.t_path:
             return
@@ -46,14 +44,24 @@ class StringDeleteOp(StringTransformOp):
         past_t_path, past_t_offset, past_t_val \
             = op.get_properties_shifted_by_hazards(hazards)
 
+        hazard = False
+
         # if text was inserted into the deletion range, expand the
         # range to delete that text as well.
-        if self.t_offset + self.t_val > past_t_offset and self.t_offset < past_t_offset:
+        if self.t_offset + self.t_val > past_t_offset \
+                and self.t_offset < past_t_offset:
             self.t_val += len(op.t_val)
         # if the insertion comes before deletion range, shift
         # deletion range forward
         elif self.t_offset >= past_t_offset:
             self.t_offset += len(op.t_val)
+        # Otherwise the past insertion has a higher index, so should be shifted
+        # to come in line with current document.
+        else:
+            shift = self.t_val * -1
+            hazard = Hazard(op, self, offset_shift=shift)
+
+        return hazard
 
     def string_delete_transform(self, op, hazards):
         """
@@ -63,12 +71,11 @@ class StringDeleteOp(StringTransformOp):
         if self.t_path != op.t_path:
             return
 
-
         past_t_path, past_t_offset, past_t_val \
             = op.get_properties_shifted_by_hazards(hazards)
 
         hazard = False
-            
+
         srs = self.t_offset # self range start
         sre = self.t_offset + self.t_val # self range end
         oprs = past_t_offset # prev op range start
@@ -80,7 +87,8 @@ class StringDeleteOp(StringTransformOp):
         #                |-- prev op --|
         # |-- self --|
         if sre <= oprs:
-            pass
+            shift = self.t_val * -1
+            hazard = Hazard(op, self, offset_shift=shift)
         # case 2
         #   |-- prev op --|
         #                   |-- self --|
@@ -90,7 +98,8 @@ class StringDeleteOp(StringTransformOp):
         #   |-- prev op --|
         #           |-- self --|
         elif srs >= oprs and sre > opre:
-            hazard = Hazard(op, self, past_t_offset, past_t_val)
+            overlap = srs - opre
+            hazard = Hazard(op, self, val_shift=overlap)
             self.t_val += (self.t_offset - (past_t_offset + past_t_val))
             self.t_val = max(0, self.t_val)
             self.t_offset = past_t_offset
@@ -98,20 +107,25 @@ class StringDeleteOp(StringTransformOp):
         #   |--- prev op ---|
         #     |-- self --|
         elif srs >= oprs and sre <= opre:
-            hazard = Hazard(op, self, past_t_offset, past_t_val)
+            overlap = srs - sre
+            hazard = Hazard(op, self, val_shift=overlap)
             self.t_offset = past_t_offset
             self.t_val = 0
         # case 5
         #     |-- prev op --|
         #   |----- self ------|
         elif sre >= opre:
-            hazard = Hazard(op, self, past_t_offset, past_t_val)
+            overlap = past_t_val * -1
+            hazard = Hazard(op, self, val_shift=overlap)
             self.t_val -= past_t_val
         # case 6
         #      |-- prev op --|
         #   |-- self --|
         else:
-            hazard = Hazard(op, self, past_t_offset, past_t_val)
+            overlap = oprs - sre
+            offset_shift = srs - oprs
+            hazard = Hazard(op, self, offset_shift=offset_shift,
+                            val_shift=overlap)
             self.t_val = past_t_offset - self.t_offset
 
         return hazard

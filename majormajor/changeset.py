@@ -292,7 +292,7 @@ class Changeset:
                 new_hazards = op.ot(pc, hazards)
                 hazards.extend(new_hazards)
                 hazards_this_changeset_causes.extend(new_hazards)
-        return hazards_this_changeset_causes[:]
+        return hazards_this_changeset_causes
 
     def to_jsonable(self):
         """
