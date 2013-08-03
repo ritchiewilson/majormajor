@@ -93,10 +93,11 @@ class MajorMajor:
     def pull_from_pending_lists(self):
         for doc in self.documents:
             old_state = copy.deepcopy(doc.get_snapshot())
-            doc.pull_from_pending_list()
-            opcodes = doc.get_diff_opcode(old_state)
-            for callback in self.signal_callbacks['receive-changeset']:
-                callback(opcodes)
+            was_changed = doc.pull_from_pending_list()
+            if was_changed:
+                opcodes = doc.get_diff_opcode(old_state)
+                for callback in self.signal_callbacks['receive-changeset']:
+                    callback(opcodes)
 
             css = doc.get_send_queue()
             if css:
