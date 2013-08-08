@@ -71,9 +71,9 @@ class Op(object):
 
     def to_jsonable(self):
         s = [{'action': self.action}, {'path': self.path}]
-        if self.val!=None:
+        if not self.val is None:
             s.append({'val': self.val})
-        if self.offset!=None:
+        if not self.offset is None:
             s.append({'offset': self.offset})
         return s
 
@@ -97,16 +97,12 @@ class Op(object):
         was not a dependency of this operation. This operation needs
         to be transformed to accomidate pc.
         """
-        for i, op in enumerate(pc.ops):
-            # then run OT, checking for new hazards
+        for op in pc.get_ops():
             func_name = self.json_opperations[op.action]
             transform_function = getattr(self, func_name)
             hazard = transform_function(op)
             if hazard:
                 op.add_new_hazard(hazard)
-
-    def get_hazards(self):
-        return self.hazards[:]
 
     def add_new_hazard(self, hazard):
         self.hazards.append(hazard)
