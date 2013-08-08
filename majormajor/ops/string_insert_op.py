@@ -23,7 +23,7 @@ class StringInsertOp(StringTransformOp):
     def is_string_insert(self):
         return True
 
-    def get_properties_shifted_by_hazards(self, hazards):
+    def get_properties_shifted_by_hazards(self):
         """
         Calculate how this op should be handled by a future op, accounting
         for any hazards that need to be applied. If this op's offset
@@ -31,16 +31,16 @@ class StringInsertOp(StringTransformOp):
         off by the size of hazard.
         """
         past_t_offset = self.t_offset
-        for hazard in hazards:
+        for hazard in self.hazards:
             past_t_offset += hazard.get_offset_shift()
         return self.t_path, past_t_offset, self.t_val
 
-    def string_insert_transform(self, op, hazards):
+    def string_insert_transform(self, op):
         if self.t_path != op.t_path:
             return
 
         past_t_path, past_t_offset, past_t_val \
-            = op.get_properties_shifted_by_hazards(hazards)
+            = op.get_properties_shifted_by_hazards()
 
         hazard = False
 
@@ -51,7 +51,7 @@ class StringInsertOp(StringTransformOp):
 
         return hazard
 
-    def string_delete_transform(self, op, hazards):
+    def string_delete_transform(self, op):
         """
         Transform this opperation when a previously unknown opperation
         did a string deletion.
@@ -60,7 +60,7 @@ class StringInsertOp(StringTransformOp):
             return
 
         past_t_path, past_t_offset, past_t_val = \
-            op.get_properties_shifted_by_hazards(hazards)
+            op.get_properties_shifted_by_hazards()
 
         hazard = False
 

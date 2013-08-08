@@ -276,7 +276,7 @@ class Changeset:
                 break
             i += 1
         
-    def ot(self, hazards=[]):
+    def ot(self):
         """
         All the unaccounted changesets should have already been
         determined. Loop through those, using them to transform this
@@ -284,15 +284,15 @@ class Changeset:
         """
         for op in self.ops:
             op.reset_transformations()
-        hazards_this_changeset_causes = []
         # those 'preceding_changesets' need to be used to transform
         # this changeset's operations.
         for pc in self.preceding_changesets:
             for op in self.ops:
-                new_hazards = op.ot(pc, hazards)
-                hazards.extend(new_hazards)
-                hazards_this_changeset_causes.extend(new_hazards)
-        return hazards_this_changeset_causes
+                op.ot(pc)
+
+    def remove_old_hazards(self, css):
+        for op in self.ops:
+            op.remove_old_hazards(css)
 
     def to_jsonable(self):
         """

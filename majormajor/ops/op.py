@@ -48,6 +48,8 @@ class Op(object):
         self.noop = False
 
         self.changeset = None
+        
+        self.hazards = []
 
     def set_changeset(self, cs):
         self.changeset = cs
@@ -63,6 +65,9 @@ class Op(object):
 
     def is_noop(self):
         return self.noop
+
+    def remove_old_hazards(self, css):
+        self.hazards = [h for h in self.hazards if not h.conflict_cs in css]
 
     def to_jsonable(self):
         s = [{'action': self.action}, {'path': self.path}]
@@ -86,26 +91,27 @@ class Op(object):
         self.t_offset = self.offset
         self.noop = False
         
-    def ot(self, pc, hazards=[]):
+    def ot(self, pc):
         """
         pc: Changeset - previous changeset which has been applied but
         was not a dependency of this operation. This operation needs
         to be transformed to accomidate pc.
         """
-        new_hazards = []
         for i, op in enumerate(pc.ops):
-            hazards_after_conflict_point = [h for h in hazards
-                                            if h.base_op == op]
             # then run OT, checking for new hazards
             func_name = self.json_opperations[op.action]
             transform_function = getattr(self, func_name)
-            hazard = transform_function(op, hazards_after_conflict_point)
+            hazard = transform_function(op)
             if hazard:
-                new_hazards.append(hazard)
-        return new_hazards
+                op.add_new_hazard(hazard)
 
+    def get_hazards(self):
+        return self.hazards[:]
 
-    def get_properties_shifted_by_hazards(self, hazards):
+    def add_new_hazard(self, hazard):
+        self.hazards.append(hazard)
+
+    def get_properties_shifted_by_hazards(self):
         """
         Calculate how this op should be handled by a future op, accounting
         for any hazards that need to be applied. This is overriden by
@@ -114,8 +120,7 @@ class Op(object):
         """
         return self.t_path, self.t_offset, self.t_val
 
-        
-    def set_transform(self, op, hazards):
+    def set_transform(self, op):
         """
         Transfrom this opperation for a when a previously unknown
         opperation was a "set" opperation.
@@ -129,7 +134,7 @@ class Op(object):
         if op_path == self.t_path[:len(op_path)]:
             self.noop = True
 
-    def string_insert_transform(self, op, hazards):
+    def string_insert_transform(self, op):
         """
         Transform this opperation when a previously unknown opperation
         did a string insert.
@@ -138,7 +143,7 @@ class Op(object):
         """
         pass
         
-    def string_delete_transform(self, op, hazards):
+    def string_delete_transform(self, op):
         """
         Transform this opperation when a previously unknown opperation
         did a string deletion.

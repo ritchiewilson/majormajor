@@ -368,7 +368,6 @@ class Document:
                     cs.relink_parent(p)
             if isinstance(p, Changeset):
                 p.add_child(cs)
-        
 
     def ot(self, start=0):
         """
@@ -382,41 +381,14 @@ class Document:
         # when a cs has one child, the child has one parent, and no
         # new hazards were produced, the child will have the same list
         # of hazards. Don't recalc.
-        recalculate_hazards_for_cs = True
-        hazards = []
         while i < len(self.ordered_changesets):
-            cs = self.ordered_changesets[i]
-            if recalculate_hazards_for_cs:
-                hazards = self.get_hazards_for_cs(cs, i)
-            new_hazards = cs.ot(hazards)
-            if new_hazards:
-                self.add_new_hazards(new_hazards)
-                recalculate_hazards_for_cs = True
-            elif len(cs.get_children()) == 1 and \
-                 len(cs.get_children()[0].get_parents()) == 1:
-                recalculate_hazards_for_cs = False
-            else:
-                recalculate_hazards_for_cs = True
+            self.ordered_changesets[i].ot()
             i += 1
-
-    def add_new_hazards(self, new_hazards):
-        ocs = {cs: i for i, cs in enumerate(self.ordered_changesets)}
-        self.hazards.extend(new_hazards)
-        self.hazards.sort(key=lambda h: h.get_conflict_op_index())
-        self.hazards.sort(key=lambda h: ocs[h.conflict_cs])
-        self.hazards.sort(key=lambda h: h.get_base_op_index())
-        self.hazards.sort(key=lambda h: ocs[h.base_cs])
 
     def remove_old_hazards(self, index=0):
         css = set(self.ordered_changesets[index:])
-        self.hazards = [h for h in self.hazards if not h.conflict_cs in css]
-
-    def get_hazards_for_cs(self, cs, index=None):
-        index = index if index else self.ordered_changesets.index(cs)
-        css = set(self.ordered_changesets[index:])
-        hazards = [h for h in self.hazards \
-                   if not h.conflict_cs in css and not cs.has_ancestor(h.base_cs)]
-        return hazards
+        for cs in self.ordered_changesets:
+            cs.remove_old_hazards(css)
 
     def has_needed_dependencies(self, cs):
         """

@@ -23,8 +23,13 @@ possible opperations.
 from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
-class TestOTStringInsertDelete:
 
+class TestOTStringInsertDelete:
+    """
+    Tests simple cases of string insertion and string deletes. These tests were
+    created before hazards came about, so they were meant to be applied more
+    simply. Thus, after each test, each hazard needs to be removed.
+    """
     def test_si_si(self):
         op1 = Op('si', [], offset=3, val="ABC")
         cs1 = Changeset('doc_id', 'author', [])
@@ -34,11 +39,13 @@ class TestOTStringInsertDelete:
         op2 = Op('si', [], offset=2, val="XYZ")
         op2.ot(cs1)
         assert op2.t_offset == 2
+        op1.hazards = []
 
         # op3 happens at an equal offset, so should be pushed forward
         op2 = Op('si', [], offset=3, val="XYZ")
         op2.ot(cs1)
         assert op2.t_offset == 6
+        op1.hazards = []
 
         # op4 happens at a later offset, so should be pushed forward
         op2 = Op('si', [], offset=5, val="XYZ")
@@ -55,12 +62,14 @@ class TestOTStringInsertDelete:
         op2.ot(cs1)
         assert op2.t_offset == 0
         assert op2.t_val == 3
+        op1.hazards = []
 
         # this deletion should expand to delete inserted text as well.
         op3 = Op('sd', [], offset=2, val=2)
         op3.ot(cs1)
         assert op3.t_offset == 2
         assert op3.t_val == 5
+        op1.hazards = []
 
         # edge case, don't delete text if don't have have to. Shift
         # delete range.
@@ -68,6 +77,7 @@ class TestOTStringInsertDelete:
         op4.ot(cs1)
         assert op4.t_offset == 6
         assert op4.t_val == 2
+        op1.hazards = []
 
         # insertion was at lower index. shift delete range forward.
         op5 = Op('sd', [], offset=4, val=2)
@@ -79,7 +89,6 @@ class TestOTStringInsertDelete:
         op1 = Op('sd', [], offset=3, val=3)
         cs1 = Changeset('doc_id', 'author', [])
         cs1.add_op(op1)
-        
 
         # op1 deletes a range after op2, so should not affect it
         #                |-- op1 --|
@@ -88,6 +97,7 @@ class TestOTStringInsertDelete:
         op2.ot(cs1)
         assert op2.t_offset == 1
         assert op2.t_val == 2
+        op1.hazards = []
 
         # The end of op3 overlaps the start of op 1
         #          |-- op1 --|
@@ -96,6 +106,7 @@ class TestOTStringInsertDelete:
         op3.ot(cs1)
         assert op3.t_offset == 2
         assert op3.t_val == 1
+        op1.hazards = []
 
         # op1 range is encompased by op 4 range
         #     |-- op1 --|
@@ -104,6 +115,7 @@ class TestOTStringInsertDelete:
         op4.ot(cs1)
         assert op4.t_offset == 2
         assert op4.t_val == 3
+        op1.hazards = []
 
         # op5 range is encompased by op1 range
         #   |---- op1 ----|
@@ -112,6 +124,7 @@ class TestOTStringInsertDelete:
         op5.ot(cs1)
         assert op5.t_offset == 3
         assert op5.t_val == 0
+        op1.hazards = []
 
         # start of op6 range overlaps end of op1 range
         #   |-- op1 --|
@@ -120,6 +133,7 @@ class TestOTStringInsertDelete:
         op6.ot(cs1)
         assert op6.t_offset == 3
         assert op6.t_val == 2
+        op1.hazards = []
 
         # start of op7 range is after start of op1 range
         #   |-- op1 --|
@@ -129,7 +143,6 @@ class TestOTStringInsertDelete:
         assert op7.t_offset == 5
         assert op7.t_val == 3
 
-        
     def test_sd_si(self):
         op1 = Op('sd', [], offset=3, val=3)
         cs1 = Changeset('doc_id', 'author', [])
@@ -140,22 +153,24 @@ class TestOTStringInsertDelete:
         op2.ot(cs1)
         assert op2.t_offset == 2
         assert op2.t_val == "ABC"
+        op1.hazards = []
 
         # edge case. avoid deleting
         op3 = Op('si', [], offset=3, val="ABC")
         op3.ot(cs1)
         assert op3.t_offset == 3
         assert op3.t_val == "ABC"
+        op1.hazards = []
 
         # text was put into delete range, so get rid of it.
         op4 = Op('si', [], offset=4, val="ABC")
         op4.ot(cs1)
         assert op4.t_offset == 3
         assert op4.t_val == ""
+        op1.hazards = []
 
         # text is at edge after delete range
         op5 = Op('si', [], offset=6, val="ABC")
         op5.ot(cs1)
         assert op5.t_offset == 3
         assert op5.t_val == "ABC"
-        
