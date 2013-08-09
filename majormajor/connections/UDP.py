@@ -60,7 +60,7 @@ class UDPBroadcastConnection(Connection):
         """
         full_msg = json.dumps(msg)
         msg_id = str(uuid.uuid4())
-        chunk_size = 4000
+        chunk_size = 1000
         chunks = [full_msg[i:i+chunk_size] \
                   for i in xrange(0, len(full_msg), chunk_size)]
         number_of_chunks = len(chunks)
