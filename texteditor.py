@@ -260,12 +260,6 @@ class TextViewWindow(Gtk.Window):
                 #if ucs.user == self.majormajor.default_user:
                 #    f.write("  <---- local")
                 f.write("\n")
-        f.write("\n\nHazzards")
-        for hazard in self.document.hazards:
-            f.write('hazard base' + str(hazard.base_cs) + '\n')
-            f.write('hazard conf' + str(hazard.conflict_cs) + '\n')
-            f.write('hazard over' + str(hazard.get_string_insert_offset_shift()) + '\n')
-            f.write('hazard size' + str(hazard.get_delete_overlap_range_size()) + '\n')
         f.close()
         print "saved"
         
