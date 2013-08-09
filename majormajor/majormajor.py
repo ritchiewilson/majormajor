@@ -175,7 +175,7 @@ class MajorMajor:
         if action == 'send_history':
             return_msg = self.receive_history(m)
         if action == 'request_changesets':
-            return_msg = self.send_changesets(m)
+            return_msg = self.respond_to_changeset_request(m)
         if action == 'sync':
             return_msg = self._sync_document(m)        
 
@@ -402,24 +402,45 @@ class MajorMajor:
         self.broadcast(msg)
         return msg
 
-    def request_changesets(self, doc_id, cs_ids):
+    def request_changesets(self, doc_id, cs_ids, request_ancestors=False):
         if len(cs_ids) == 0:
             return {}
-        msg = {"action":"request_changesets",
-               "user":self.default_user,
-               "doc_id":doc_id,
-               'cs_ids':cs_ids}
+        doc = self.get_document_by_id(doc_id)
+        if not doc:
+            return
+        msg = {"action": "request_changesets",
+               "user": self.default_user,
+               "doc_id": doc_id,
+               'cs_ids': cs_ids,
+               "request_ancestors": request_ancestors}
+        if request_ancestors:
+            deps = doc.get_dependencies()
+            msg['dependencies'] = [cs.get_id() for cs in deps]
+            msg['number_of_known_css'] = len(doc.get_ordered_changesets())
         self.broadcast(msg)
         return msg
 
+    def respond_to_changeset_request(self, m):
+        doc = self.get_document_by_id(m['doc_id'])
+        if not doc:
+            return
+
+        css = []
+        if m['request_ancestors']:
+            css = doc.request_ancestors(m['cs_ids'], m['dependencies'])
+        else:
+            css = [doc.get_changeset_by_id(cs) for cs in m['cs_ids']
+                   if doc.knows_changeset(cs)]
+        self.send_changesets(doc=doc, css=css)
+            
     def send_changesets(self, m=None, doc=None, css=None):
         msg = {}
         doc = self.get_document_by_id(m['doc_id']) if not doc else doc
         if not doc:
             return
-        cs_data = None
+        css_data = None
         if css:
-            css_data = [cs.to_dict() for cs in css] 
+            css_data = [cs.to_dict() for cs in css]
         else:
             css_data = [doc.get_changeset_by_id(cs).to_dict() for cs in m['cs_ids'] \
                         if doc.knows_changeset(cs)]
@@ -475,8 +496,9 @@ class MajorMajor:
 
         doc.time_of_last_received_cs = datetime.now()
 
-        cs_ids = self.update_missing_changesets(doc)
-        msg = self.request_changesets(doc.get_id(), cs_ids)
+        cs_ids = list(doc.get_missing_changeset_ids())
+        msg = self.request_changesets(doc.get_id(), cs_ids,
+                                      request_ancestors=True)
 
         if not self.HAS_EVENT_LOOP:
             self.pull_from_pending_lists()
@@ -486,10 +508,10 @@ class MajorMajor:
     def update_missing_changesets(self, doc):
         if not doc in self.requested_changesets:
             self.requested_changesets[doc] = {}
-        cs_ids = [cs_id for cs_id in doc.get_missing_changeset_ids() \
+        cs_ids = [cs_id for cs_id in doc.get_missing_changeset_ids()
                   if not cs_id in self.requested_changesets[doc]]
         for cs_id in cs_ids:
-            self.requested_changesets[doc][cs_id] = {'countdown':0, \
+            self.requested_changesets[doc][cs_id] = {'countdown': 0,
                                                      'next_start': 1}
         return cs_ids
         

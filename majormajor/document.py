@@ -134,6 +134,38 @@ class Document:
         send_css = [cs for cs in self.dependencies if not cs.get_id() in remote_deps]
         return request_css, send_css
 
+    def request_ancestors(self, cs_ids, dep_ids):
+        """
+        A remote user has requested info on cs_ids and their ancestors. Based
+        on the remote users dep_ids and the number of changesets they know
+        about, put together a reasonable collection of changesets to send to
+        them.
+        """
+        response_css = set(self.get_changeset_by_id(cs) for cs in cs_ids
+                           if self.knows_changeset(cs))
+        MAX_CHANGESETS = 100
+        for dep_id in dep_ids:
+            dep = self.get_changeset_by_id(dep_id)
+            if dep and dep in self.ordered_changesets_set_cache:
+                css = dep.get_children()
+                while css and len(response_css) < MAX_CHANGESETS:
+                    cs = css.pop()
+                    if not cs in response_css:
+                        response_css.update([cs])
+                        css.extend(cs.get_children())
+        while cs_ids and len(response_css) < MAX_CHANGESETS:
+            cs_id = cs_ids.pop()
+            cs = self.get_changeset_by_id(cs_id)
+            if not cs:
+                continue
+            css = cs.get_parents()
+            while css and len(response_css) < MAX_CHANGESETS:
+                cs = css.pop()
+                if not cs in response_css:
+                    response_css.update([cs])
+                    css.extend(cs.get_parents())
+        return list(response_css)
+
     def set_initial_snapshot(self, s):
         """
         Can stick in boilerplate snapshot for doc. turns snapshot into an
