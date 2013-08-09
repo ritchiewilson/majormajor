@@ -48,7 +48,6 @@ class Document:
         self.snapshot = {}
         self.root_changeset = None
         self.dependencies = []
-        self.hazards = []
         # set initial snapshot if called upon
         if not snapshot == None:
             self.set_initial_snapshot(snapshot)
@@ -359,7 +358,7 @@ class Document:
         """
         if self.knows_changeset(cs.get_id()):
             return
-        self.all_known_changesets[cs.get_id()] = {'obj': cs, 'active':False }
+        self.all_known_changesets[cs.get_id()] = {'obj': cs, 'active': False}
         for p in cs.get_parents():
             if not isinstance(p, Changeset):
                 p_obj = self.get_changeset_by_id(p)
@@ -378,14 +377,15 @@ class Document:
         # any hazards past start point are not invalid.
         self.remove_old_hazards(i)
 
-        # when a cs has one child, the child has one parent, and no
-        # new hazards were produced, the child will have the same list
-        # of hazards. Don't recalc.
         while i < len(self.ordered_changesets):
             self.ordered_changesets[i].ot()
             i += 1
 
     def remove_old_hazards(self, index=0):
+        """
+        All changesets from index forward need to be recalculated so any
+        hazards based off them are invalid.
+        """
         css = set(self.ordered_changesets[index:])
         for cs in self.ordered_changesets:
             cs.remove_old_hazards(css)
