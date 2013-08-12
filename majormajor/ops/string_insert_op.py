@@ -30,11 +30,7 @@ class StringInsertOp(StringTransformOp):
         is further in the text than the hazard, then this offset is
         off by the size of hazard.
         """
-        hazards = self.hazards
-        if not cs is None:
-            hazards = [h for h in self.hazards
-                       if cs is h.conflict_cs or
-                       cs.has_ancestor(h.conflict_cs)]
+        hazards = self.get_relevant_hazards(cs)
         past_t_offset = self.t_offset
         for hazard in hazards:
             past_t_offset += hazard.get_offset_shift()

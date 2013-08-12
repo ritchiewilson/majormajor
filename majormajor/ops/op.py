@@ -69,6 +69,21 @@ class Op(object):
     def remove_old_hazards(self, css):
         self.hazards = [h for h in self.hazards if not h.conflict_cs in css]
 
+    def get_relevant_hazards(self, cs=None):
+        """
+        Hazards stored in the op are only relevant when the conflic_cs is an
+        acestor the changeset being transformed. For running tests, it is
+        possible that the op has no cs, in which case ignore any hazards.
+
+        TODO: THIS IS WHERE SHIT GETS UNUSABLY SLOW
+        """
+        if cs is None:
+            return []
+
+        return [h for h in self.hazards
+                if cs is h.conflict_cs or
+                cs.has_ancestor(h.conflict_cs)]
+
     def to_jsonable(self):
         s = [{'action': self.action}, {'path': self.path}]
         if not self.val is None:

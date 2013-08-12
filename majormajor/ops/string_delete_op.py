@@ -30,11 +30,7 @@ class StringDeleteOp(StringTransformOp):
         off by the size of hazard. If this op is the base of the
         hazard, then it is telling a future op to delete too much.
         """
-        hazards = self.hazards
-        if not cs is None:
-            hazards = [h for h in self.hazards
-                       if cs is h.conflict_cs or
-                       cs.has_ancestor(h.conflict_cs)]
+        hazards = self.get_relevant_hazards(cs)
         past_t_val = self.t_val
         past_t_offset = self.t_offset
         for hazard in hazards:
