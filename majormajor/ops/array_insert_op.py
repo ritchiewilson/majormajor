@@ -31,16 +31,66 @@ class ArrayInsertOp(Op):
         #hazards = self.get_relevant_hazards(cs)
         return self.t_path, self.t_offset, self.t_val
 
-    def string_insert_transform(self, op):
+    def array_insert_transform(self, op):
         """
+        This op is being transformed by a previously unknown array insert. The
+        result could be nothing, or some peice of the path must be shifted, or
+        the offset must be shifted.
         """
         past_t_path, past_t_offset, past_t_val = \
             op.get_properties_shifted_by_hazards(self.get_changeset())
+
+        # when this path is shorter than the old one, nothing needs to be done.
+        if len(self.t_path) < len(past_t_path):
+            pass
+
+        # when the paths are exactly equal, this offset may need to shift up
+        elif past_t_path == self.t_path:
+            if past_t_offset <= self.t_offset:
+                self.t_offset += len(past_t_val)
+        # otherwise the path may need to shift
+        elif past_t_path == self.t_path[:len(past_t_path)]:
+            if past_t_offset <= self.t_path[len(past_t_path)]:
+                self.t_path[len(past_t_path)] += len(past_t_val)
         return False
 
-    def string_delete_transform(self, op):
+    def array_delete_transform(self, op):
         """
-        Transform this opperation when a previously unknown opperation
-        did a string deletion.
+        Transform this opperation when a previously unknown opperation did an
+        array deletion. If this op happens within an element that was deleted,
+        this becomes a noop. If they have the same path then this could be a
+        noop if it is is the deletion range, or the offset needs to reduce if
+        it is past the delete range. Lastly, it could just mean the path needs
+        to shift at one point.
         """
+        past_t_path, past_t_offset, past_t_val = \
+            op.get_properties_shifted_by_hazards(self.get_changeset())
+
+        # when this path is shorter than the old one, nothing needs to be done.
+        if len(self.t_path) < len(past_t_path):
+            pass
+        elif not past_t_path == self.t_path[:len(past_t_path)]:
+            pass
+        elif len(past_t_path) < len(self.t_path):
+            # this op could have been within a deleted element
+            delete_range = xrange(past_t_offset, past_t_offset + past_t_val)
+            if self.t_path[len(past_t_path)] in delete_range:
+                self.noop = True
+            # or the path needs to shift
+            elif self.t_path[len(past_t_path)] > past_t_offset:
+                self.t_path[len(past_t_path)] -= past_t_val
+        # lastly, if they have the same path, offsets may need to shift
+        elif past_t_path == self.t_path:
+            # this op could have been in delete range (avoid deleting if at all
+            # possible)
+            start = past_t_offset + 1
+            stop = past_t_offset + past_t_val
+            delete_range = xrange(start, stop)
+            if self.t_offset in delete_range:
+                self.t_offset = past_t_offset
+                self.t_val = []
+                self.noop = True
+            elif self.t_offset > past_t_offset:
+                self.t_offset -= past_t_val
+
         return False
