@@ -22,7 +22,7 @@ class StringDeleteOp(StringTransformOp):
     def is_string_delete(self):
         return True
 
-    def get_properties_shifted_by_hazards(self):
+    def get_properties_shifted_by_hazards(self, cs):
         """
         Calculate how this op should be handled by a future op, accounting
         for any hazards that need to be applied. If this op's offset
@@ -30,9 +30,14 @@ class StringDeleteOp(StringTransformOp):
         off by the size of hazard. If this op is the base of the
         hazard, then it is telling a future op to delete too much.
         """
+        hazards = self.hazards
+        if not cs is None:
+            hazards = [h for h in self.hazards
+                       if cs is h.conflict_cs or
+                       cs.has_ancestor(h.conflict_cs)]
         past_t_val = self.t_val
         past_t_offset = self.t_offset
-        for hazard in self.hazards:
+        for hazard in hazards:
             past_t_val += hazard.get_val_shift()
             past_t_offset += hazard.get_offset_shift()
         return self.t_path, past_t_offset, past_t_val
@@ -42,7 +47,7 @@ class StringDeleteOp(StringTransformOp):
             return
 
         past_t_path, past_t_offset, past_t_val \
-            = op.get_properties_shifted_by_hazards()
+            = op.get_properties_shifted_by_hazards(self.get_changeset())
 
         hazard = False
 
@@ -72,7 +77,7 @@ class StringDeleteOp(StringTransformOp):
             return
 
         past_t_path, past_t_offset, past_t_val \
-            = op.get_properties_shifted_by_hazards()
+            = op.get_properties_shifted_by_hazards(self.get_changeset())
 
         hazard = False
 
