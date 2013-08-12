@@ -181,6 +181,11 @@ class Op(object):
         return
 
     def array_delete_transform(self, op):
+        """
+        Previous op was an array delete. If this changeset went into the delete
+        range, this becomes a noop. If the ops share a path, and the delete
+        range comes before the index for this op, shift the path.
+        """
         past_t_path, past_t_offset, past_t_val \
             = op.get_properties_shifted_by_hazards(self.get_changeset())
 
