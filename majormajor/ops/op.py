@@ -162,9 +162,6 @@ class Op(object):
         In all default cases, do nothing
         """
         pass
-                
-    def is_string_transform(self):
-        return False
 
     def is_string_delete(self):
         return False

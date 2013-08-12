@@ -16,10 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from ..hazards.hazard import Hazard
-from string_transform_op import StringTransformOp
+from op import Op
 
 
-class StringInsertOp(StringTransformOp):
+class StringInsertOp(Op):
     def is_string_insert(self):
         return True
 

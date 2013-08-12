@@ -16,9 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from ..hazards.hazard import Hazard
-from string_transform_op import StringTransformOp
-        
-class StringDeleteOp(StringTransformOp):
+from op import Op
+
+
+class StringDeleteOp(Op):
     def is_string_delete(self):
         return True
 
