@@ -174,37 +174,37 @@ class TestDocumentApplyOp:
         assert doc2.get_value([3,1,0]) == 'dim'
 
     def test_array_insert(self):
-        doc0 =  Document()
+        doc0 = Document()
         doc0.snapshot = []
         doc1 = self.doc1
         doc2 = self.doc2
 
         # whole doc is just an empty array. alter it
-        op1 = Op('ai', [], val='c', offset=0)
+        op1 = Op('ai', [], val=['c'], offset=0)
         doc0.apply_op(op1)
         assert doc0.snapshot == ['c']
         # insert at start
-        op2 = Op('ai', [], val='a', offset=0)
+        op2 = Op('ai', [], val=['a'], offset=0)
         doc0.apply_op(op2)
         assert doc0.snapshot == ['a', 'c']
         # insert at end
-        op3 = Op('ai', [], val='d', offset=2)
+        op3 = Op('ai', [], val=['d'], offset=2)
         doc0.apply_op(op3)
-        assert doc0.snapshot == ['a','c','d']
-        # insert in middle
-        op4 = Op('ai', [], val='b', offset=1)
+        assert doc0.snapshot == ['a', 'c', 'd']
+        # insert several in the middle
+        op4 = Op('ai', [], val=['b0', 'b1', 'b2'], offset=1)
         doc0.apply_op(op4)
-        assert doc0.snapshot == ['a','b','c','d']
+        assert doc0.snapshot == ['a', 'b0', 'b1', 'b2', 'c', 'd']
 
         # insert into some array deep in doc
-        op5 = Op('ai', [3,1], val='a', offset=1)
+        op5 = Op('ai', [3, 1], val=['a'], offset=1)
         doc2.apply_op(op5)
-        assert doc2.get_value([3,1]) == ['dimen', 'a']
+        assert doc2.get_value([3, 1]) == ['dimen', 'a']
 
         # again
-        op6 = Op('ai', ['fifth'], val='a', offset=1)
+        op6 = Op('ai', ['fifth'], val=['a'], offset=1)
         doc1.apply_op(op6)
-        result6 = [55,'a',66,{'sixth': 'deep string'}, 'rw']
+        result6 = [55, 'a', 66, {'sixth': 'deep string'}, 'rw']
         assert doc1.get_value(['fifth']) == result6
 
     def test_array_delete(self):

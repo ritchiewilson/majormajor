@@ -674,7 +674,7 @@ class Document:
     def array_insert(self, op):
         cur = self.get_value(op.path)
         r = cur[:op.offset]
-        r.append(op.val)
+        r.extend(op.val)
         r.extend(cur[op.offset:])
         return r
 
