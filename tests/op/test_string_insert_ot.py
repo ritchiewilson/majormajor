@@ -42,9 +42,9 @@ class TestStringInsertOT:
 
         # op3 happens at path, but lower offset, no change
         op3_path = array_path + [2]
-        op3 = Op('si', array_path, offset=2, val="XYZ")
+        op3 = Op('si', op3_path, offset=2, val="XYZ")
         op3.ot(cs1)
-        assert op3.t_path == array_path
+        assert op3.t_path == op3_path
         op1.hazards = []
 
         # op4 happens in an array element being pushed forward (edge case)
