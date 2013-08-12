@@ -24,6 +24,7 @@ class Op(object):
     def __new__(cls, *args, **kwargs):
         subclass = {'si': StringInsertOp,
                     'sd': StringDeleteOp,
+                    'ai': ArrayInsertOp,
                     'set': SetOp }.get(args[0], cls)
         
         new_instance = object.__new__(subclass, *args, **kwargs)
@@ -163,23 +164,29 @@ class Op(object):
         """
         pass
 
+    def array_insert_transform(self, op):
+        pass
+
     def is_string_delete(self):
         return False
 
     def is_string_insert(self):
         return False
 
+    def is_array_insert(self):
+        return False
+
     json_opperations = {
         'set': 'set_transform',
-        'bn' : 'boolean_negation',
-        'na' : 'number_add',
-        'si' : 'string_insert_transform',
-        'sd' : 'string_delete_transform',
-        'ai' : 'array_insert',
-        'ad' : 'array_delete',
-        'am' : 'array_move',
-        'oi' : 'object_insert',
-        'od' : 'object_delete'
+        'bn': 'boolean_negation_transform',
+        'na': 'number_add_transform',
+        'si': 'string_insert_transform',
+        'sd': 'string_delete_transform',
+        'ai': 'array_insert_transform',
+        'ad': 'array_delete_transform',
+        'am': 'array_move_transform',
+        'oi': 'object_insert_transform',
+        'od': 'object_delete_transform'
     }
 
     
@@ -189,3 +196,4 @@ class SetOp(Op):
     
 from string_insert_op import StringInsertOp
 from string_delete_op import StringDeleteOp
+from array_insert_op import ArrayInsertOp

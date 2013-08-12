@@ -76,3 +76,19 @@ class StringInsertOp(Op):
             hazard = Hazard(op, self, offset_shift=len(self.t_val))
 
         return hazard
+
+    def array_insert_transform(self, op):
+        """
+        Previous op was an array insert. Shift this ops path if necessary.
+        """
+        past_t_path, past_t_offset, past_t_val \
+            = op.get_properties_shifted_by_hazards(self.get_changeset())
+
+        if len(self.t_path) <= len(past_t_path):
+            return
+
+        path_index = len(past_t_path)  # the only path peice that might move
+        if past_t_path == self.t_path[:path_index]:
+            if past_t_offset <= self.t_path[path_index]:
+                self.t_path[path_index] += len(past_t_val)
+        return
