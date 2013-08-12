@@ -123,7 +123,7 @@ class Op(object):
     def add_new_hazard(self, hazard):
         self.hazards.append(hazard)
 
-    def get_properties_shifted_by_hazards(self):
+    def get_properties_shifted_by_hazards(self, cs):
         """
         Calculate how this op should be handled by a future op, accounting
         for any hazards that need to be applied. This is overriden by
@@ -180,6 +180,23 @@ class Op(object):
                 self.t_path[path_index] += len(past_t_val)
         return
 
+    def array_delete_transform(self, op):
+        past_t_path, past_t_offset, past_t_val \
+            = op.get_properties_shifted_by_hazards(self.get_changeset())
+
+        if len(self.t_path) <= len(past_t_path):
+            return
+
+        path_index = len(past_t_path)  # the only path peice that might move
+        if past_t_path == self.t_path[:path_index]:
+            delete_range = xrange(past_t_offset, past_t_offset + past_t_val)
+            if self.t_path[path_index] in delete_range:
+                self.noop = True
+                return
+            if not self.t_path[path_index] < past_t_offset:
+                self.t_path[path_index] -= past_t_val
+        return False
+
     def is_string_delete(self):
         return False
 
@@ -187,6 +204,9 @@ class Op(object):
         return False
 
     def is_array_insert(self):
+        return False
+
+    def is_array_delete(self):
         return False
 
     json_opperations = {
@@ -210,3 +230,4 @@ class SetOp(Op):
 from string_insert_op import StringInsertOp
 from string_delete_op import StringDeleteOp
 from array_insert_op import ArrayInsertOp
+from array_delete_op import ArrayDeleteOp
