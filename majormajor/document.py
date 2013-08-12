@@ -110,7 +110,8 @@ class Document:
         return self.time_of_last_received_cs
 
     def get_changesets_in_ranges(self, start_ids, end_ids):
-        cs_in_range = []            
+        return self.ordered_changesets[:]
+        cs_in_range = []
         start_reached = False if start_ids else True
         for cs in self.ordered_changesets:
             if len(end_ids) == 0:
@@ -175,6 +176,7 @@ class Document:
         op = Op('set', [], val=s)
         self.add_local_op(op)
         cs = self.close_changeset()
+        self.clear_send_queue()
         self.root_changeset = cs
         self.ordered_changesets = [cs]
         self.ordered_changesets_set_cache = set([cs])

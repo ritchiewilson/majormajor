@@ -42,8 +42,11 @@ class UDPBroadcastConnection(Connection):
         self.s.bind((self.host, listen_port))
         GObject.io_add_watch(self.s, GObject.IO_IN, self._listen_callback)
 
+    def get_listen_info(self):
+        return {'conn_type': 'UDPBroadcast',
+                'conn_data': {'port': self.listen_port}}
 
-    def send(self, msg):
+    def send(self, msg, users=[], broadcast=True):
         """
         Using a simple UDP socket, this broadcasts the given message. For
         larger messages, split the raw json into 4000 character

@@ -18,7 +18,7 @@
 from gi.repository import Gtk, Pango
 from majormajor.majormajor import MajorMajor
 from majormajor.ops.op import Op
-import sys
+import os
 
 
 class TextViewWindow(Gtk.Window):
@@ -45,16 +45,21 @@ class TextViewWindow(Gtk.Window):
 
         
         self.majormajor = MajorMajor()
-        
-        listen_port = 8000 if len(sys.argv) < 2 else int(sys.argv[1])
-        self.majormajor.open_default_connection(listen_port)
-        self.document = self.majormajor.new_document(snapshot='')
-        self.majormajor.announce()
-        
+
         self.majormajor.connect('remote-cursor-update', self.remote_cursor_update)
         self.majormajor.connect('receive-changeset', self.receive_changeset)
         self.majormajor.connect('receive-snapshot', self.receive_snapshot)
         self.majormajor.connect('accept-invitation', self.accept_invitation)
+
+    def open_default_connection(self, listen_port):
+        self.majormajor.open_default_connection(listen_port)
+        self.document = self.majormajor.new_document(snapshot='')
+        self.majormajor.announce()
+
+    def open_mq_connection(self):
+        self.majormajor.open_mq_connection()
+        self.document = self.majormajor.new_document(snapshot='')
+        self.majormajor.announce()
 
     def accept_invitation(self, doc):
         self.document = doc
@@ -73,14 +78,12 @@ class TextViewWindow(Gtk.Window):
     def insert_text_handler(s, textbuffer, iter_, text, length):
         op = Op('si', [], offset=iter_.get_offset(), val=text)
         s.document.add_local_op(op)
-        print "inserting"
-        
+
     def delete_range_handler(s, textbuffer, start, end):
         val = end.get_offset() - start.get_offset()
         op = Op('sd', [], offset=start.get_offset(), val=val)
         s.document.add_local_op(op)
-        print 'deleting'
-        
+
     def receive_changeset(self, opcodes):
         h_ids = self.majormajor_handlers
         with self.textbuffer.handler_block(h_ids['insert-text']):
@@ -127,56 +130,15 @@ class TextViewWindow(Gtk.Window):
         button_drop_css = Gtk.ToggleToolButton(Gtk.STOCK_CANCEL)
         toolbar.insert(button_drop_css, 2)
 
-        #button_bold = Gtk.ToolButton.new_from_stock(Gtk.STOCK_BOLD)
-        #toolbar.insert(button_bold, 0)
+        button_invite = Gtk.ToolButton()
+        button_invite.set_stock_id(Gtk.STOCK_YES)
+        toolbar.insert(button_invite, 3)
 
-        #button_italic = Gtk.ToolButton.new_from_stock(Gtk.STOCK_ITALIC)
-        #toolbar.insert(button_italic, 1)
-
-        #button_underline = Gtk.ToolButton.new_from_stock(Gtk.STOCK_UNDERLINE)
-        #toolbar.insert(button_underline, 2)
-        
         button_save.connect("clicked", self.on_save_clicked)
         button_random.connect("clicked", self.on_random_clicked)
         button_drop_css.connect("clicked", self.on_drop_css_clicked)
-        #button_bold.connect("clicked", self.on_button_clicked, self.tag_bold)
-        #button_italic.connect("clicked", self.on_button_clicked, self.tag_italic)
-        #button_underline.connect("clicked", self.on_button_clicked, self.tag_underline)
+        button_invite.connect("clicked", self.on_invite_clicked)
 
-        toolbar.insert(Gtk.SeparatorToolItem(), 3)
-
-        radio_justifyleft = Gtk.RadioToolButton()
-        radio_justifyleft.set_stock_id(Gtk.STOCK_JUSTIFY_LEFT)
-        toolbar.insert(radio_justifyleft, 4)
-
-        radio_justifycenter = Gtk.RadioToolButton.new_with_stock_from_widget(
-            radio_justifyleft, Gtk.STOCK_JUSTIFY_CENTER)
-        toolbar.insert(radio_justifycenter, 5)
-
-        radio_justifyright = Gtk.RadioToolButton.new_with_stock_from_widget(
-            radio_justifyleft, Gtk.STOCK_JUSTIFY_RIGHT)
-        toolbar.insert(radio_justifyright, 6)
-
-        radio_justifyfill = Gtk.RadioToolButton.new_with_stock_from_widget(
-            radio_justifyleft, Gtk.STOCK_JUSTIFY_FILL)
-        toolbar.insert(radio_justifyfill, 7)
-
-        radio_justifyleft.connect("toggled", self.on_justify_toggled,
-            Gtk.Justification.LEFT)
-        radio_justifycenter.connect("toggled", self.on_justify_toggled,
-            Gtk.Justification.CENTER)
-        radio_justifyright.connect("toggled", self.on_justify_toggled,
-            Gtk.Justification.RIGHT)
-        radio_justifyfill.connect("toggled", self.on_justify_toggled,
-            Gtk.Justification.FILL)
-
-        toolbar.insert(Gtk.SeparatorToolItem(), 8)
-
-        button_clear = Gtk.ToolButton.new_from_stock(Gtk.STOCK_CLEAR)
-        button_clear.connect("clicked", self.on_clear_clicked)
-        toolbar.insert(button_clear, 9)
-
-        toolbar.insert(Gtk.SeparatorToolItem(), 10)
 
 
     def create_textview(self):
@@ -261,8 +223,6 @@ class TextViewWindow(Gtk.Window):
                 #    f.write("  <---- local")
                 f.write("\n")
         f.close()
-        print "saved"
-        
 
     def on_random_clicked(self, widget):
         self.majormajor.big_insert = not self.majormajor.big_insert
@@ -270,7 +230,10 @@ class TextViewWindow(Gtk.Window):
     def on_drop_css_clicked(self, widget):
         b = self.majormajor.drop_random_css
         self.majormajor.drop_random_css = not b
-        
+
+    def on_invite_clicked(self, widget):
+        self.majormajor.invite_all(self.document)
+
     def on_button_clicked(self, widget, tag):
         self.majormajor.big_insert = not self.majormajor.big_insert
 
@@ -298,7 +261,22 @@ class TextViewWindow(Gtk.Window):
         self.textview.set_justification(justification)
 
 
+import argparse
+
+parser = argparse.ArgumentParser(description='Demo collaborative text editor.')
+parser.add_argument('-port', type=int)
+parser.add_argument('-mq', action='store_const', const=1)
+args = parser.parse_args()
+
 win = TextViewWindow()
 win.connect("delete-event", Gtk.main_quit)
 win.show_all()
+if args.port or (not args.port and not args.mq):
+    port = args.port if args.port else 8000
+    win.open_default_connection(port)
+elif args.mq:
+    win.open_mq_connection()
+
 Gtk.main()
+            
+    

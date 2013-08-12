@@ -15,13 +15,28 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import uuid
 
-    
-class Connection:
-    """
-    Extensible connection type. Users should be able to subclass
-    Connection to allow MajorMajor to communicate over arbitrary
-    protocols.
-    """
-    def __init__(self):
-        self.users = []
+
+class User:
+    def __init__(self, _id=None):
+        self._id = _id if _id else uuid.uuid4()
+        self.documents = set([])
+        self.connections = {}
+        self.nickname = str(self._id)
+
+    def add_document(self, doc):
+        self.documents.update([doc])
+
+    def add_connections(self, conns):
+        for conn in conns:
+            self.connections[conn['conn_type']] = conn['conn_data']
+
+    def get_properties_for_connection(self, conn_type):
+        return self.connections.get(conn_type, None)
+
+    def has_connection(self, conn_type):
+        return conn_type in self.connections
+
+    def get_id(self):
+        return self._id

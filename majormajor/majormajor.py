@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from document import Document
-from changeset import Changeset
+from user import User
 from ops.op import Op
 import socket, copy, difflib
 import json
@@ -40,6 +40,7 @@ class MajorMajor:
         self.documents = []
         self.connections = []
         self.default_user = str(uuid.uuid4())
+        self.remote_users = {}
         self.requested_changesets = {}
 
         # When used as a plugin, this should be tied into an event
@@ -56,7 +57,7 @@ class MajorMajor:
 
     def test_thousands_ops(self):
         if self.big_insert:
-            doc = self.documents[0]
+            doc = self.documents[-1]
             old_state = doc.get_snapshot()
             import string
             n = random.randint(1,5)
@@ -86,10 +87,15 @@ class MajorMajor:
         sending json by broadcasting UDP over the local network.
         """
         from connections.UDP import UDPBroadcastConnection
-        c = UDPBroadcastConnection(callback=self._listen_callback, listen_port=port)
+        c = UDPBroadcastConnection(callback=self._listen_callback,
+                                   listen_port=port)
         self.connections.append(c)
-        
-        
+
+    def open_mq_connection(self):
+        from connections.MQ import RabbitMQConnection
+        c = RabbitMQConnection(callback=self._listen_callback)
+        self.connections.append(c)
+
     def pull_from_pending_lists(self):
         for doc in self.documents:
             old_state = copy.deepcopy(doc.get_snapshot())
@@ -112,7 +118,7 @@ class MajorMajor:
         assigned. When no user is defined, the default is used.
         TODO: should split this up into new_document and open_document
         """
-        if user == None:
+        if user is None:
             user = self.default_user
         d = Document(doc_id, user, snapshot)
         if not self.HAS_EVENT_LOOP:
@@ -139,9 +145,9 @@ class MajorMajor:
                'cs_id': cs.get_id(),
                'user':cs.get_user(),
                'doc_id':cs.get_doc_id()}
-        self.broadcast(msg)
+        self.broadcast(msg, broadcast=True)
         return msg
-        
+
     def _listen_callback(self, msg):
         """
         Whenever a socket is written to, this callback handles the
@@ -177,7 +183,7 @@ class MajorMajor:
         if action == 'request_changesets':
             return_msg = self.respond_to_changeset_request(m)
         if action == 'sync':
-            return_msg = self._sync_document(m)        
+            return_msg = self._sync_document(m)
 
         return return_msg
 
@@ -198,7 +204,7 @@ class MajorMajor:
                     doc_dict[cs_id]['next_start'] = count['next_start'] * 2
                 else:
                     doc_dict[cs_id]['countdown'] -= 1
-            msg = self.request_changesets(doc_id, request_list)
+            msg = self.request_changesets(doc, request_list, broadcast=True)
         if self.HAS_EVENT_LOOP:
             return True
         return msg
@@ -214,31 +220,39 @@ class MajorMajor:
         for doc in self.documents:
             time_diff = datetime.now() - doc.get_time_of_last_received_cs()
             if time_diff.seconds < 5: continue
-            self._sync_document(doc_id=doc.get_id())
+            self._sync_document(doc=doc)
         if self.HAS_EVENT_LOOP:
             return True
         return msg
 
-    def _sync_document(self, msg=None, doc_id=None):
+    def _sync_document(self, msg=None, doc=None, user=None):
         if self.drop_random_css:
             return
-        if doc_id == None:
-            doc_id=msg['doc_id']
-        doc = self.get_document_by_id(doc_id)
+        if doc is None:
+            doc_id = msg['doc_id']
+            doc = self.get_document_by_id(doc_id)
         if not doc:
+            return
+        # figure out who to send this message to
+        users = []
+        if msg:
+            users = [self.get_user_by_id(uuid.UUID(msg['user']))]
+        else:
+            users = [u for u in self.remote_users.values()]
+        if not users:
             return
         request_css, send_css = [], []
         synced = False
         if msg:
             # if there wasa message, and it was synced, quit
-            if msg['synced'] == True:
+            if msg['synced'] is True:
                 return
 
             # first accept any incoming changesets, collecting missing
             # changesets.
-
-            r_css = {'css':msg['send_css']}
-            self.receive_changesets(r_css, doc_id=doc_id)
+            user = self.get_user_by_id(uuid.UUID(msg['user']))
+            r_css = {'css': msg['send_css']}
+            self.receive_changesets(r_css, doc=doc, user=user)
             missing_cs_ids = self.update_missing_changesets(doc)
 
             # add to that any other missing deps
@@ -257,37 +271,46 @@ class MajorMajor:
         deps = [dep.get_id() for dep in doc.get_dependencies()]
         msg = {'action': 'sync',
                'doc_id': doc.get_id(),
-               'user': doc.get_user(),
+               'user': self.default_user,
                'synced': synced,
-               'request_css':request_css,
+               'request_css': request_css,
                'send_css': send_css,
                'deps': deps}
-        self.broadcast(msg)
+        self.broadcast(msg, users=users)
         return msg
 
-        
-    def receive_announce(self, m):
-        msg = self.invite_to_document(m['user'], self.documents[0].get_user(),
-                                self.documents[0].get_id())
-        return msg
+    def receive_announce(self, msg):
+        if msg['user'] == self.default_user: return {}
+        user_id = uuid.UUID(msg['user'])
+        user = self.get_user_by_id(user_id)
+        if user:
+            user.add_connections(msg['conns'])
+            return {}
+        user = User(user_id)
+        user.add_connections(msg['conns'])
+        self.add_user(user)
+        self.announce(users=[user])
+        return {}
 
-        
     def send_snapshot(self, m):
         """
         Send the current snapshot of a document to a collaborator
         requesting it. Need to include the dependency id for it.
         """
         doc = self.get_document_by_id(m['doc_id'])
+        if not doc:
+            return
+        user = self.get_user_by_id(uuid.UUID(m['user']))
         deps = []
         for dep in doc.get_dependencies():
             deps.append(dep.to_dict())
         msg = {'action': 'send_snapshot',
                'doc_id': doc.get_id(),
-               'user': doc.get_user(),
+               'user': self.default_user,
                'snapshot': doc.get_snapshot(),
                'deps': deps,
-               'root':doc.get_root_changeset().to_dict()}
-        self.broadcast(msg)
+               'root': doc.get_root_changeset().to_dict()}
+        self.broadcast(msg, users=[user])
         return msg
 
     def receive_snapshot(self, m):
@@ -297,18 +320,18 @@ class MajorMajor:
         doc = self.get_document_by_id(m['doc_id'])
         if not doc:
             return
+        user = self.get_user_by_id(uuid.UUID(m['user']))
         last_known_deps = []
         doc.receive_snapshot(m)
         new_css = doc.get_dependencies()
         msg = {}
         if new_css:
-            msg = self.request_history(doc, new_css, last_known_deps)
+            msg = self.request_history(doc, user, new_css, last_known_deps)
         for callback in self.signal_callbacks['receive-snapshot']:
             callback(doc.get_snapshot())
-
         return msg
 
-    def request_history(self, doc, new_css, last_known_css):
+    def request_history(self, doc, user, new_css, last_known_css):
         """
         Request full info for changsets that have been referenced by are
         unknown to this collaborator. Also must send out the last
@@ -323,7 +346,7 @@ class MajorMajor:
                'new_cs_ids': [cs.get_id() for cs in new_css ],
                'last_known_cs_ids': [cs.get_id() for cs in last_known_css]
                }
-        self.broadcast(msg)
+        self.broadcast(msg, users=[user])
         return msg
 
     def send_history(self, m):
@@ -333,6 +356,7 @@ class MajorMajor:
         doc = self.get_document_by_id(m['doc_id'])
         if not doc:
             return
+        user = self.get_user_by_id(uuid.UUID(m['user']))
         css = doc.get_changesets_in_ranges(m['last_known_cs_ids'],
                                           m['new_cs_ids'])
         msg = {'action': 'send_history',
@@ -340,7 +364,7 @@ class MajorMajor:
                'user': doc.get_user(),
                'history': [cs.to_dict() for cs in css]
                }
-        self.broadcast(msg)
+        self.broadcast(msg, users=[user])
         return msg
 
     def receive_history(self, m):
@@ -355,69 +379,75 @@ class MajorMajor:
             return
         doc.receive_history(m)
 
-        
     def accept_invitation_to_document(self, m):
         """
         Accept an inviation to work on a document by requesting it's
         snapshot.
         """
+        doc = self.get_document_by_id(m['doc_id'])
+        if doc:
+            return
         doc = self.new_document(m['doc_id'])
-        # TODO hardcoding this for testing
-        self.documents = [doc]
-        msg = self.request_snapshot(m['doc_id'])
+        user = self.get_user_by_id(uuid.UUID(m['user']))
+        msg = self.request_snapshot(doc, user)
         for callback in self.signal_callbacks['accept-invitation']:
             callback(doc)
         return msg
         
-    def request_snapshot(self, doc_id):
+    def request_snapshot(self, doc, user):
         """
         Request a document snapshot from a user.
         """
-        doc = self.get_document_by_id(doc_id)
-        msg = {'action':'request_snapshot',
-               'user': doc.get_user(),
-               'doc_id': doc_id}
-        self.broadcast(msg)
+        msg = {'action': 'request_snapshot',
+               'user': self.default_user,
+               'doc_id': doc.get_id()}
+        self.broadcast(msg, users=[user])
         return msg
-            
-    def announce(self):
+
+    def announce(self, users=[], broadcast=True):
         """
         Builds message for announcing avalibility
         """
-        msg = {'action':'announce',
-               'user':self.default_user}
-        self.broadcast(msg)
+        conns = [conn.get_listen_info() for conn in self.connections]
+        msg = {'action': 'announce',
+               'user': self.default_user,
+               'conns': conns}
+        self.broadcast(msg, users, broadcast)
         return msg
 
-    def invite_to_document(self, to_user, from_user, doc_id):
+    def invite_all(self, doc):
+        for user in self.remote_users.values():
+            self.invite_to_document(doc, user)
+            
+    def invite_to_document(self, doc, to_user):
         """
         Builds a message to invite another user to collaborate on a
         document.
         TODO: set from_user to defualt_user
         """
-        msg = {"action":"invite_to_document",
-               "to_user":to_user,
-               "user":from_user,
-               "doc_id":doc_id}
-        self.broadcast(msg)
+        msg = {"action": "invite_to_document",
+               "to_user": str(to_user.get_id()),
+               "user": self.default_user,
+               "doc_id": doc.get_id()}
+        self.broadcast(msg, [to_user])
         return msg
 
-    def request_changesets(self, doc_id, cs_ids, request_ancestors=False):
+    def request_changesets(self, doc, cs_ids, request_ancestors=False,
+                           users=[], broadcast=False):
         if len(cs_ids) == 0:
             return {}
-        doc = self.get_document_by_id(doc_id)
         if not doc:
             return
         msg = {"action": "request_changesets",
                "user": self.default_user,
-               "doc_id": doc_id,
+               "doc_id": doc.get_id(),
                'cs_ids': cs_ids,
                "request_ancestors": request_ancestors}
         if request_ancestors:
             deps = doc.get_dependencies()
             msg['dependencies'] = [cs.get_id() for cs in deps]
             msg['number_of_known_css'] = len(doc.get_ordered_changesets())
-        self.broadcast(msg)
+        self.broadcast(msg, users=users, broadcast=broadcast)
         return msg
 
     def respond_to_changeset_request(self, m):
@@ -448,22 +478,19 @@ class MajorMajor:
                "user":self.default_user,
                "doc_id":doc.get_id(),
                'css':css_data}
-        self.broadcast(msg)
+        users = self.remote_users.values()
+        self.broadcast(msg, users=users)
         return msg
         
-    def broadcast(self, msg):
+    def broadcast(self, msg, users=[], broadcast=False):
         """
         msg is dict which contains all the information which should be
         broadcast to peers. Each connection is responsible for
         formatting the message how it wants and sending it out.
-
-        TODO: this will send out infor to eveyone, always. with better
-        connections types, need methods to send information to only
-        those who request it.
         """
         for c in self.connections:
-            c.send(msg)
-        
+            c.send(msg, users, broadcast)
+            
     def connect(self, signal, callback):
         """
         Let clients connect to MajorMajor by defining callbacks for
@@ -475,7 +502,7 @@ class MajorMajor:
         m['css'] = [m['cs']]
         return self.receive_changesets(m)
     
-    def receive_changesets(self, m, doc_id=None):
+    def receive_changesets(self, m, doc=None, user=None):
         """
         Handler for recieving changest messages from remote
         collaborators.
@@ -486,19 +513,21 @@ class MajorMajor:
         # to simulate network problems.
         if self.drop_random_css and random.random() < 1:
             return msg
-        if doc_id == None:
+        if doc is None:
             doc_id = m['doc_id']
-        doc = self.get_document_by_id(doc_id)
+            doc = self.get_document_by_id(doc_id)
         if not doc:
             return
+        if user is None:
+            user = self.get_user_by_id(uuid.UUID(m['user']))
 
         doc.receive_changesets(m['css'])
 
         doc.time_of_last_received_cs = datetime.now()
 
         cs_ids = list(doc.get_missing_changeset_ids())
-        msg = self.request_changesets(doc.get_id(), cs_ids,
-                                      request_ancestors=True)
+        msg = self.request_changesets(doc, cs_ids, request_ancestors=True,
+                                      users=[user], broadcast=False)
 
         if not self.HAS_EVENT_LOOP:
             self.pull_from_pending_lists()
@@ -514,6 +543,16 @@ class MajorMajor:
             self.requested_changesets[doc][cs_id] = {'countdown': 0,
                                                      'next_start': 1}
         return cs_ids
+
+    def get_user_by_id(self, user_id):
+        return self.remote_users.get(user_id, None)
+
+    def add_user(self, user):
+        if not user.get_id() in self.remote_users:
+            self.remote_users[user.get_id()] = user
+
+    def knows_user(self, user_id):
+        return user_id in self.remote_users
         
     signal_callbacks = {
         'receive-changeset' : [],
