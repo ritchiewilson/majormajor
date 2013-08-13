@@ -7,3 +7,5 @@
 /.gitignore~
 *.pyc
 *.py~
+docs/build
+*.rst~

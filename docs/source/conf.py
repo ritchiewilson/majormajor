@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
-# Majormajor documentation build configuration file, created by
-# sphinx-quickstart on Tue Aug 13 18:21:24 2013.
+# MajorMajor documentation build configuration file, created by
+# sphinx-quickstart on Tue Aug 13 19:05:08 2013.
 #
 # This file is execfile()d with the current directory set to its containing dir.
 #
@@ -16,7 +16,8 @@ import sys, os
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath(os.path.join('..', '..')))
 
 # -- General configuration -----------------------------------------------------
 
@@ -40,7 +41,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Majormajor'
+project = u'MajorMajor'
 copyright = u'2013, Ritchie Wilson'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -64,7 +65,7 @@ release = '0.1'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_patterns = []
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
@@ -167,7 +168,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'Majormajordoc'
+htmlhelp_basename = 'MajorMajordoc'
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -186,7 +187,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'Majormajor.tex', u'Majormajor Documentation',
+  ('index', 'MajorMajor.tex', u'MajorMajor Documentation',
    u'Ritchie Wilson', 'manual'),
 ]
 
@@ -216,7 +217,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'majormajor', u'Majormajor Documentation',
+    ('index', 'majormajor', u'MajorMajor Documentation',
      [u'Ritchie Wilson'], 1)
 ]
 
@@ -230,8 +231,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'Majormajor', u'Majormajor Documentation',
-   u'Ritchie Wilson', 'Majormajor', 'One line description of project.',
+  ('index', 'MajorMajor', u'MajorMajor Documentation',
+   u'Ritchie Wilson', 'MajorMajor', 'One line description of project.',
    'Miscellaneous'),
 ]
 
