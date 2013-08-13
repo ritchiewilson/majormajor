@@ -25,6 +25,7 @@ class Op(object):
         subclass = {'si': StringInsertOp,
                     'sd': StringDeleteOp,
                     'ai': ArrayInsertOp,
+                    'ad': ArrayDeleteOp,
                     'set': SetOp }.get(args[0], cls)
         
         new_instance = object.__new__(subclass, *args, **kwargs)

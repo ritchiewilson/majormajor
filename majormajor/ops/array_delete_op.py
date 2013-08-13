@@ -31,16 +31,39 @@ class ArrayDeleteOp(Op):
         #hazards = self.get_relevant_hazards(cs)
         return self.t_path, self.t_offset, self.t_val
 
-    def string_insert_transform(self, op):
+    def array_insert_transform(self, op):
         """
+        A Previously unknown op did an array insert. If their paths do not
+        cross, do nothing. If the two ops have identical paths, this delete's
+        offset may need to be shifted forward to accomidate. It could also need
+        to expand to delete the elements previously inserted. If their path's
+        cross, this delete's path may need to be shifted at one point.
         """
         past_t_path, past_t_offset, past_t_val = \
             op.get_properties_shifted_by_hazards(self.get_changeset())
+
+        # if this path is smaller than the old one, there's no conflict
+        if len(self.t_path) < len(past_t_path):
+            pass
+        elif past_t_path == self.t_path:
+            if past_t_offset <= self.t_offset:
+                #shift out of the way of a previous insertion
+                self.t_offset += len(past_t_val)
+            elif past_t_offset < self.t_offset + self.t_val:
+                # expand deletion to include past insertion
+                self.t_val += len(past_t_val)
+                # otherwise the path may need to shift
+        elif past_t_path == self.t_path[:len(past_t_path)]:
+            # path may need to shift at one point
+            if past_t_offset <= self.t_path[len(past_t_path)]:
+                self.t_path[len(past_t_path)] += len(past_t_val)
         return False
 
-    def string_delete_transform(self, op):
+    def array_delete_transform(self, op):
         """
         Transform this opperation when a previously unknown opperation
         did a string deletion.
         """
+        past_t_path, past_t_offset, past_t_val = \
+            op.get_properties_shifted_by_hazards(self.get_changeset())
         return False
