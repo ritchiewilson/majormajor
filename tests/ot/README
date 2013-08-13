@@ -1,0 +1,36 @@
+=== 
+Tests In This Directory 
+===
+
+These are tests for operational transformation when branches have multiple ops
+before they are brought back together. Therefore they also effectively do some
+testing for how Hazards are collected and applied during ot (even though they
+are not explicitly mentioned in many of these tests).
+
+=== 
+Tips for Writing OT Tests
+===
+
+To fully test sequences of ops, they should be added to changesets, which are
+then added to a document. The document then handles ot. Documents can be
+created with an initial snapshot, then the root changeset is a 'set' op with
+that python object.
+:: 
+   doc = Document(snapshot='123abcde789') 
+   root = doc.get_root_changeset()
+
+By default, when a doc is created, changesets it receives are added to a
+queue, and are not immediately applied. To automatically pull from the queue,
+mark that the document has no event loop:
+::
+   doc.HAS_EVENT_LOOP = False
+   
+===
+Notes for Reading OT Tests
+===
+
+OT tests are written systematically where possible (meaning 'hardly
+ever'). There are too many combinations for combining ops, so tests are more
+anecdotal than comprehensive. Also, some tests are based on glitches found when
+actually working collaboratively, so they can but unnecessarily lengthy or
+convoluted.
