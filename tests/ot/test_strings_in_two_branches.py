@@ -15,15 +15,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import pytest
+"""
+Tests string opperations, inserts and deletes, in two branches which then
+get synced together.
+
+Note: These tests are mostly based on glitches found when actually typing
+collaboratively. This means the tests are 1) not comprehensive, and 2) slightly
+convoluted.
+"""
 
 from majormajor.document import Document
 from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
+
 class TestChangesetOT:
 
-    def test_hazard_on_multiple_deletes(self):
+    def test_one_delete_in_first_branch(self):
         """
         A Hazard is applied to a branch with multiple deletes. The hazard
         should affect one delete but not the other.
@@ -44,9 +52,8 @@ class TestChangesetOT:
         doc.receive_changeset(A1)
         assert doc.get_snapshot() == '123456789'
 
-        # Branch B has common parent with A. B has three deletes. The
-        # first creates a hazard, the second should be affected by it,
-        # the third should not.
+        # Branch B has common parent with A. B has three deletes, some of which
+        # overlap the delete in branch A
         B0 = Changeset(doc.get_id(), 'u2', [root])
         opB0 = Op('sd', [], offset=4, val=2)
         B0.add_op(opB0)
@@ -56,7 +63,7 @@ class TestChangesetOT:
         assert opB0.t_offset == 6
         assert opB0.t_val == 0
 
-        # Delete range affected by hazard
+        # Partially overlaping delete
         B1 = Changeset(doc.get_id(), 'u2', [B0])
         opB1 = Op('sd', [], offset=6, val=2)
         B1.add_op(opB1)
@@ -66,7 +73,7 @@ class TestChangesetOT:
         assert opB1.t_offset == 6
         assert opB1.t_val == 2
 
-        # Delete Range unaffected by hazzard
+        # Delete Range unaffected by branch A
         B2 = Changeset(doc.get_id(), 'u2', [B1])
         opB2 = Op('sd', [], offset=1, val=1)
         B2.add_op(opB2)
@@ -83,18 +90,14 @@ class TestChangesetOT:
         doc.receive_changeset(C)
         assert doc.get_snapshot() == '123456789'
 
-
-    def test_hazard_base_branch_contains_multiple_deletes(self):
-        """
-
-        """
+    def test_two_deletes_in_first_branch(self):
         """  01234567890123456 """
         s = 'ab123cd456gh789ik'
         doc = Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
-        # construct branch A, which begins with a string delete, then
+        # construct branch A, which has two string deletes, then
         # adds text
         A0 = Changeset(doc.get_id(), 'u1', [root])
         A0.add_op(Op('sd', [], offset=7, val=2))
@@ -111,7 +114,7 @@ class TestChangesetOT:
         assert doc.get_snapshot() == 'ab123cdef6ghik'
 
         # Branch B has common parent with A. First it deletes a
-        # partialy overlaping range to create a hazard.
+        # partialy overlaping range in A
         B0 = Changeset(doc.get_id(), 'u2', [root])
         opB0 = Op('sd', [], offset=8, val=2)
         B0.add_op(opB0)
@@ -121,7 +124,7 @@ class TestChangesetOT:
         assert opB0.t_offset == 9
         assert opB0.t_val == 1
 
-        # Delete range affected by hazard
+        # Delete range partially overlaping range in A
         B1 = Changeset(doc.get_id(), 'u2', [B0])
         opB1 = Op('sd', [], offset=10, val=2)
         B1.add_op(opB1)
@@ -131,7 +134,7 @@ class TestChangesetOT:
         assert opB1.t_offset == 11
         assert opB1.t_val == 0
 
-        # Delete Range unaffected by hazzard
+        # Delete Range unaffected by branch A
         B2 = Changeset(doc.get_id(), 'u2', [B1])
         opB2 = Op('sd', [], offset=2, val=3)
         B2.add_op(opB2)
@@ -147,10 +150,11 @@ class TestChangesetOT:
         doc.receive_changeset(C)
         assert doc.get_snapshot() == 'abcdefghijk'
 
-
-    def test_multiple_delete_hazards(self):
+    def test_delete_overlaping_ranges(self):
         """
-
+        Branch A and B independently delete the same characters in the middle
+        of the string using different combinations of opperations. Then they
+        perform other string operations that need to keep synced.
         """
         s = '0123456789'
         doc = Document(snapshot=s)
@@ -164,7 +168,7 @@ class TestChangesetOT:
         A0.set_id('A')
         doc.receive_changeset(A0)
         assert doc.get_snapshot() == '01236789'
-        
+
         A1 = Changeset(doc.get_id(), 'u1', [A0])
         A1.add_op(Op('sd', [], offset=3, val=2))
         doc.receive_changeset(A1)
@@ -175,8 +179,8 @@ class TestChangesetOT:
         doc.receive_changeset(A2)
         assert doc.get_snapshot() == '0189'
 
-        # Branch B has common parent with A. It deletes all but 'xyz'
-
+        # Branch B has common parent with A. It deletes all but '89'
+        
         # User saw '0123456789' and deleted '3456', which was already
         # deleted in branch A.
         B0 = Changeset(doc.get_id(), 'u2', [root])
@@ -199,7 +203,7 @@ class TestChangesetOT:
         assert opB1.t_offset == 2
         assert opB1.t_val == 0
 
-        # Delete Range unaffected by hazzard
+        # Delete Range not known by branch A
         B2 = Changeset(doc.get_id(), 'u2', [B1])
         opB2 = Op('sd', [], offset=1, val=2)
         B2.add_op(opB2)
@@ -215,32 +219,30 @@ class TestChangesetOT:
         doc.receive_changeset(C)
         assert doc.get_snapshot() == '0123456789'
 
-    def test_multiple_delete_hazards2(self):
+    def test_delete_overlaping_ranges2(self):
         """
-
+        Branch A and B independently delete the same characters in the middle
+        of the string using different combinations of opperations. Then they
+        perform other string operations that need to keep synced.
         """
         s = '0123456789TARGET'
         doc = Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
-        # construct branch A, which deletes the '234567' in three ops.
-
-        # first delete '45'
+        # branch deletes the '234567' in three ops.
         A0 = Changeset(doc.get_id(), 'u1', [root])
         A0.add_op(Op('sd', [], offset=4, val=2))
         A0.set_id('A0')
         doc.receive_changeset(A0)
         assert doc.get_snapshot() == '01236789TARGET'
 
-        # delete '36'
         A1 = Changeset(doc.get_id(), 'u1', [A0])
         A1.add_op(Op('sd', [], offset=3, val=2))
         A1.set_id('A1')
         doc.receive_changeset(A1)
         assert doc.get_snapshot() == '012789TARGET'
 
-        # delete '27'
         A2 = Changeset(doc.get_id(), 'u1', [A1])
         A2.add_op(Op('sd', [], offset=2, val=2))
         A2.set_id('A2')
@@ -285,7 +287,16 @@ class TestChangesetOT:
         assert opB2.t_val == 4
 
     def test_overlaping_deletes_then_string_insert(self):
+        """
+        Both branches delete all the A's from the document. Additionally, one
+        branch deletes all the Z's, the other all the X's. Then one inserts
+        'The Quick ', the other branch 'Brown Fox.' Each uses several ops to
+        achieve this.
 
+        NOTE: This example is slightly convoluted and hard to follow. The test
+        is only here because it was a reproducable failure that had no solution
+        at the time.
+        """
         s = 'ZZZZZZZAAAAAAAAAAAAAAAAAAAAAAAAAXXXXX'
         doc = Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
@@ -296,7 +307,7 @@ class TestChangesetOT:
         A0.add_op(Op('si', [], offset=0, val='T'))
         A0.set_id('A0')
         doc.receive_changeset(A0)
-        
+
         A1 = Changeset(doc.get_id(), 'u1', [A0])
         A1.add_op(Op('si', [], offset=1, val="h"))
         A1.add_op(Op('si', [], offset=2, val="e"))
@@ -319,9 +330,8 @@ class TestChangesetOT:
         doc.receive_changeset(A3)
         assert doc.get_snapshot() == 'The Quick XXXXX'
 
-
-        # Branch B has common parent with A. It deletes all but
-        # '789', then inserts 'Hello' at the start.
+        # Branch B has common parent with A. It saw the original document and
+        # deleted everything but the Y's
         B0 = Changeset(doc.get_id(), 'u2', [root])
         opB0 = Op('sd', [], offset=7, val=30)
         B0.add_op(opB0)
@@ -331,6 +341,7 @@ class TestChangesetOT:
         assert opB0.t_offset == 10
         assert opB0.t_val == 5
 
+        # User B saw only the Y's and inserted text at the end.
         B1 = Changeset(doc.get_id(), 'u2', [B0])
         opB1 = Op('si', [], offset=7, val='Brown Fox.')
         B1.add_op(opB1)
@@ -339,8 +350,11 @@ class TestChangesetOT:
         assert doc.get_snapshot() == 'The Quick Brown Fox.'
         assert opB1.t_offset == 10
 
-    def test_overlaping_deletes_then_string_insert2(self):
-
+    def test_overlaping_deletes_then_string_insert_reversed(self):
+        """
+        Same test as the previous one, except the order of the branches is
+        reversed.
+        """
         s = 'ZZZZZZZAAAAAAAAAAAAAAAAAAAAAAAAAXXXXX'
         doc = Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
@@ -351,7 +365,7 @@ class TestChangesetOT:
         A0.add_op(Op('si', [], offset=0, val='T'))
         A0.set_id('2')
         doc.receive_changeset(A0)
-        
+
         A1 = Changeset(doc.get_id(), 'u1', [A0])
         A1.add_op(Op('si', [], offset=1, val="h"))
         A1.add_op(Op('si', [], offset=2, val="e"))
