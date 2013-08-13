@@ -33,8 +33,8 @@ class TestChangesetOT:
 
     def test_one_delete_in_first_branch(self):
         """
-        A Hazard is applied to a branch with multiple deletes. The hazard
-        should affect one delete but not the other.
+        There is one delete in the first branch, multiple in branch B, then
+        each has more string inserts.
         """
         doc = Document(snapshot='123abcde789')
         doc.HAS_EVENT_LOOP = False
@@ -59,6 +59,9 @@ class TestChangesetOT:
         B0.add_op(opB0)
         B0.set_id('B')
         doc.receive_changeset(B0)
+        a_index = doc.get_ordered_changesets().index(A0)
+        b_index = doc.get_ordered_changesets().index(B0)
+        assert a_index < b_index
         assert doc.get_snapshot() == '123456789'
         assert opB0.t_offset == 6
         assert opB0.t_val == 0
@@ -90,8 +93,59 @@ class TestChangesetOT:
         doc.receive_changeset(C)
         assert doc.get_snapshot() == '123456789'
 
+    def test_one_delete_in_first_branch_reversed(self):
+        """
+        Same opperations as previous test, but order of branches is reversed
+        (B now before A)
+        """
+        doc = Document(snapshot='123abcde789')
+        doc.HAS_EVENT_LOOP = False
+        root = doc.get_root_changeset()
+
+        A0 = Changeset(doc.get_id(), 'u1', [root])
+        A0.add_op(Op('sd', [], offset=3, val=5))
+        A0.set_id('1A')
+        doc.receive_changeset(A0)
+
+        A1 = Changeset(doc.get_id(), 'u1', [A0])
+        A1.add_op(Op('si', [], offset=3, val='456'))
+        doc.receive_changeset(A1)
+
+        B0 = Changeset(doc.get_id(), 'u2', [root])
+        opB0 = Op('sd', [], offset=4, val=2)
+        B0.add_op(opB0)
+        B0.set_id('0B')
+        doc.receive_changeset(B0)
+        a_index = doc.get_ordered_changesets().index(A0)
+        b_index = doc.get_ordered_changesets().index(B0)
+        assert a_index > b_index
+        assert doc.get_snapshot() == '123456789'
+        assert opB0.t_offset == 4
+        assert opB0.t_val == 2
+
+        B1 = Changeset(doc.get_id(), 'u2', [B0])
+        opB1 = Op('sd', [], offset=6, val=2)
+        B1.add_op(opB1)
+        B1.set_id('B1')
+        doc.receive_changeset(B1)
+        assert doc.get_snapshot() == '1234569'
+
+        B2 = Changeset(doc.get_id(), 'u2', [B1])
+        opB2 = Op('sd', [], offset=1, val=1)
+        B2.add_op(opB2)
+        B2.set_id('B2')
+        doc.receive_changeset(B2)
+        assert doc.get_snapshot() == '134569'
+
+        # combine these braches again
+        C = Changeset(doc.get_id(), 'u2', [A1, B2])
+        C.add_op(Op('si', [], offset=1, val='2'))
+        C.add_op(Op('si', [], offset=6, val='78'))
+        doc.receive_changeset(C)
+        assert doc.get_snapshot() == '123456789'
+
     def test_two_deletes_in_first_branch(self):
-        """  01234567890123456 """
+        """  01234567890123456 (helpful index of characters in doc)"""
         s = 'ab123cd456gh789ik'
         doc = Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
@@ -103,11 +157,11 @@ class TestChangesetOT:
         A0.add_op(Op('sd', [], offset=7, val=2))
         A0.set_id('A')
         doc.receive_changeset(A0)
-        
+
         A1 = Changeset(doc.get_id(), 'u1', [A0])
         A1.add_op(Op('sd', [], offset=10, val=3))
         doc.receive_changeset(A1)
-        
+
         A2 = Changeset(doc.get_id(), 'u1', [A1])
         A2.add_op(Op('si', [], offset=7, val='ef'))
         doc.receive_changeset(A2)
@@ -120,6 +174,9 @@ class TestChangesetOT:
         B0.add_op(opB0)
         B0.set_id('B')
         doc.receive_changeset(B0)
+        a_index = doc.get_ordered_changesets().index(A0)
+        b_index = doc.get_ordered_changesets().index(B0)
+        assert a_index < b_index
         assert doc.get_snapshot() == 'ab123cdefghik'
         assert opB0.t_offset == 9
         assert opB0.t_val == 1
@@ -143,6 +200,66 @@ class TestChangesetOT:
         assert doc.get_snapshot() == 'abcdefghik'
         assert opB2.t_offset == 2
         assert opB2.t_val == 3
+
+        # combine these braches again
+        C = Changeset(doc.get_id(), 'u2', [A2, B2])
+        C.add_op(Op('si', [], offset=9, val='j'))
+        doc.receive_changeset(C)
+        assert doc.get_snapshot() == 'abcdefghijk'
+
+    def test_two_deletes_in_first_branch_reverse(self):
+        """
+        Same opperations as previous test, but order of branches is reversed
+        (B now before A)
+        """
+        s = 'ab123cd456gh789ik'
+        doc = Document(snapshot=s)
+        doc.HAS_EVENT_LOOP = False
+        root = doc.get_root_changeset()
+
+        A0 = Changeset(doc.get_id(), 'u1', [root])
+        A0.add_op(Op('sd', [], offset=7, val=2))
+        A0.set_id('1A')
+        doc.receive_changeset(A0)
+
+        A1 = Changeset(doc.get_id(), 'u1', [A0])
+        A1.add_op(Op('sd', [], offset=10, val=3))
+        doc.receive_changeset(A1)
+
+        A2 = Changeset(doc.get_id(), 'u1', [A1])
+        A2.add_op(Op('si', [], offset=7, val='ef'))
+        doc.receive_changeset(A2)
+        assert doc.get_snapshot() == 'ab123cdef6ghik'
+
+        # Branch B has common parent with A. First it deletes a
+        # partialy overlaping range in A
+        B0 = Changeset(doc.get_id(), 'u2', [root])
+        opB0 = Op('sd', [], offset=8, val=2)
+        B0.add_op(opB0)
+        B0.set_id('0B')
+        doc.receive_changeset(B0)
+        a_index = doc.get_ordered_changesets().index(A0)
+        b_index = doc.get_ordered_changesets().index(B0)
+        assert a_index > b_index
+        assert doc.get_snapshot() == 'ab123cdefghik'
+        assert opB0.t_offset == 8
+        assert opB0.t_val == 2
+
+        # Delete range partially overlaping range in A
+        B1 = Changeset(doc.get_id(), 'u2', [B0])
+        opB1 = Op('sd', [], offset=10, val=2)
+        B1.add_op(opB1)
+        B1.set_id('B1')
+        doc.receive_changeset(B1)
+        assert doc.get_snapshot() == 'ab123cdefghik'
+
+        # Delete Range unaffected by branch A
+        B2 = Changeset(doc.get_id(), 'u2', [B1])
+        opB2 = Op('sd', [], offset=2, val=3)
+        B2.add_op(opB2)
+        B2.set_id('B2')
+        doc.receive_changeset(B2)
+        assert doc.get_snapshot() == 'abcdefghik'
 
         # combine these braches again
         C = Changeset(doc.get_id(), 'u2', [A2, B2])
@@ -180,7 +297,7 @@ class TestChangesetOT:
         assert doc.get_snapshot() == '0189'
 
         # Branch B has common parent with A. It deletes all but '89'
-        
+
         # User saw '0123456789' and deleted '3456', which was already
         # deleted in branch A.
         B0 = Changeset(doc.get_id(), 'u2', [root])
@@ -188,6 +305,9 @@ class TestChangesetOT:
         B0.add_op(opB0)
         B0.set_id('B')
         doc.receive_changeset(B0)
+        a_index = doc.get_ordered_changesets().index(A0)
+        b_index = doc.get_ordered_changesets().index(B0)
+        assert a_index < b_index
         assert doc.get_snapshot() == '0189'
         assert opB0.t_offset == 2
         assert opB0.t_val == 0
@@ -212,6 +332,69 @@ class TestChangesetOT:
         assert doc.get_snapshot() == '09'
         assert opB2.t_offset == 1
         assert opB2.t_val == 2
+
+        # combine these braches again
+        C = Changeset(doc.get_id(), 'u2', [A2, B2])
+        C.add_op(Op('si', [], offset=1, val='12345678'))
+        doc.receive_changeset(C)
+        assert doc.get_snapshot() == '0123456789'
+
+    def test_delete_overlaping_ranges_revered(self):
+        """
+        Same opperations as previous test, but order of branches is reversed
+        (B now before A)
+        """
+        s = '0123456789'
+        doc = Document(snapshot=s)
+        doc.HAS_EVENT_LOOP = False
+        root = doc.get_root_changeset()
+
+        # construct branch A, which deletes all but the first three
+        # and last three characters.
+        A0 = Changeset(doc.get_id(), 'u1', [root])
+        A0.add_op(Op('sd', [], offset=4, val=2))
+        A0.set_id('1A')
+        doc.receive_changeset(A0)
+
+        A1 = Changeset(doc.get_id(), 'u1', [A0])
+        A1.add_op(Op('sd', [], offset=3, val=2))
+        doc.receive_changeset(A1)
+
+        A2 = Changeset(doc.get_id(), 'u1', [A1])
+        A2.add_op(Op('sd', [], offset=2, val=2))
+        doc.receive_changeset(A2)
+        assert doc.get_snapshot() == '0189'
+
+        # Branch B has common parent with A. It deletes all but '89'
+
+        # User saw '0123456789' and deleted '3456'
+        B0 = Changeset(doc.get_id(), 'u2', [root])
+        opB0 = Op('sd', [], offset=3, val=4)
+        B0.add_op(opB0)
+        B0.set_id('0B')
+        doc.receive_changeset(B0)
+        a_index = doc.get_ordered_changesets().index(A0)
+        b_index = doc.get_ordered_changesets().index(B0)
+        assert a_index > b_index
+        assert doc.get_snapshot() == '0189'
+        assert opB0.t_offset == 3
+        assert opB0.t_val == 4
+
+        # User saw '012789' and deleted '27'
+        B1 = Changeset(doc.get_id(), 'u2', [B0])
+        opB1 = Op('sd', [], offset=2, val=2)
+        B1.add_op(opB1)
+        B1.set_id('B1')
+        doc.receive_changeset(B1)
+        assert doc.get_snapshot() == '0189'
+
+        # Delete Range not known by branch A
+        B2 = Changeset(doc.get_id(), 'u2', [B1])
+        opB2 = Op('sd', [], offset=1, val=2)
+        B2.add_op(opB2)
+        B2.set_id('B2')
+        doc.receive_changeset(B2)
+        assert doc.get_snapshot() == '09'
 
         # combine these braches again
         C = Changeset(doc.get_id(), 'u2', [A2, B2])
@@ -259,6 +442,9 @@ class TestChangesetOT:
         B0.add_op(opB0)
         B0.set_id('B0')
         doc.receive_changeset(B0)
+        a_index = doc.get_ordered_changesets().index(A0)
+        b_index = doc.get_ordered_changesets().index(B0)
+        assert a_index < b_index
         assert doc.get_snapshot() == '0189TARGET'
         assert opB0.t_offset == 2
         assert opB0.t_val == 0
@@ -285,6 +471,68 @@ class TestChangesetOT:
         assert doc.get_snapshot() == 'TARGET'
         assert opB2.t_offset == 0
         assert opB2.t_val == 4
+
+    def test_delete_overlaping_ranges2_reversed(self):
+        """
+        Same opperations as previous test, but order of branches is reversed
+        (B now before A)
+        """
+        s = '0123456789TARGET'
+        doc = Document(snapshot=s)
+        doc.HAS_EVENT_LOOP = False
+        root = doc.get_root_changeset()
+
+        # branch deletes the '234567' in three ops.
+        A0 = Changeset(doc.get_id(), 'u1', [root])
+        A0.add_op(Op('sd', [], offset=4, val=2))
+        A0.set_id('1A0')
+        doc.receive_changeset(A0)
+
+        A1 = Changeset(doc.get_id(), 'u1', [A0])
+        A1.add_op(Op('sd', [], offset=3, val=2))
+        A1.set_id('A1')
+        doc.receive_changeset(A1)
+
+        A2 = Changeset(doc.get_id(), 'u1', [A1])
+        A2.add_op(Op('sd', [], offset=2, val=2))
+        A2.set_id('A2')
+        doc.receive_changeset(A2)
+        assert doc.get_snapshot() == '0189TARGET'
+
+        # Branch B has common parent with A. It deletes all but
+        # 'TARGET' in three ops.
+
+        # User Saw '0123456789TARGET', deleted '234', which branch A
+        # already did.
+        B0 = Changeset(doc.get_id(), 'u2', [root])
+        opB0 = Op('sd', [], offset=2, val=3)
+        B0.add_op(opB0)
+        B0.set_id('0B0')
+        doc.receive_changeset(B0)
+        a_index = doc.get_ordered_changesets().index(A0)
+        b_index = doc.get_ordered_changesets().index(B0)
+        assert a_index > b_index
+        assert doc.get_snapshot() == '0189TARGET'
+        assert opB0.t_offset == 2
+        assert opB0.t_val == 3
+
+        # User Saw '0156789TARGET', deleted '567', which branch A
+        # already did.
+        B1 = Changeset(doc.get_id(), 'u2', [B0])
+        opB1 = Op('sd', [], offset=2, val=3)
+        B1.add_op(opB1)
+        B1.set_id('B1')
+        doc.receive_changeset(B1)
+        assert doc.get_snapshot() == '0189TARGET'
+
+        # User Saw '0189TARGET', deleted '0189', which branch A has
+        # NOT done.
+        B2 = Changeset(doc.get_id(), 'u2', [B1])
+        opB2 = Op('sd', [], offset=0, val=4)
+        B2.add_op(opB2)
+        B2.set_id('B2')
+        doc.receive_changeset(B2)
+        assert doc.get_snapshot() == 'TARGET'
 
     def test_overlaping_deletes_then_string_insert(self):
         """
@@ -337,6 +585,9 @@ class TestChangesetOT:
         B0.add_op(opB0)
         B0.set_id('B0')
         doc.receive_changeset(B0)
+        a_index = doc.get_ordered_changesets().index(A0)
+        b_index = doc.get_ordered_changesets().index(B0)
+        assert a_index < b_index
         assert doc.get_snapshot() == 'The Quick '
         assert opB0.t_offset == 10
         assert opB0.t_val == 5
@@ -393,6 +644,9 @@ class TestChangesetOT:
         B0.add_op(opB0)
         B0.set_id('1')
         doc.receive_changeset(B0)
+        a_index = doc.get_ordered_changesets().index(A0)
+        b_index = doc.get_ordered_changesets().index(B0)
+        assert a_index > b_index
         assert doc.get_snapshot() == 'The Quick '
         assert opB0.t_offset == 7
         assert opB0.t_val == 30
