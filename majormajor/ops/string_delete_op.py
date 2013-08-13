@@ -76,58 +76,7 @@ class StringDeleteOp(Op):
         past_t_path, past_t_offset, past_t_val \
             = op.get_properties_shifted_by_hazards(self.get_changeset())
 
-        hazard = False
-
-        srs = self.t_offset # self range start
-        sre = self.t_offset + self.t_val # self range end
-        oprs = past_t_offset # prev op range start
-        opre = past_t_offset + past_t_val # prev op range end
-        # there are six ways two delete ranges can overlap and
-        # each one is a different case.
-
-        # case 1
-        #                |-- prev op --|
-        # |-- self --|
-        if sre <= oprs:
-            shift = self.t_val * -1
-            hazard = Hazard(op, self, offset_shift=shift)
-        # case 2
-        #   |-- prev op --|
-        #                   |-- self --|
-        elif srs >= opre:
-            self.t_offset -= past_t_val
-        # case 3
-        #   |-- prev op --|
-        #           |-- self --|
-        elif srs >= oprs and sre > opre:
-            overlap = srs - opre
-            hazard = Hazard(op, self, val_shift=overlap)
-            self.t_val += (self.t_offset - (past_t_offset + past_t_val))
-            self.t_val = max(0, self.t_val)
-            self.t_offset = past_t_offset
-        # case 4
-        #   |--- prev op ---|
-        #     |-- self --|
-        elif srs >= oprs and sre <= opre:
-            overlap = srs - sre
-            hazard = Hazard(op, self, val_shift=overlap)
-            self.t_offset = past_t_offset
-            self.t_val = 0
-        # case 5
-        #     |-- prev op --|
-        #   |----- self ------|
-        elif sre >= opre:
-            overlap = past_t_val * -1
-            hazard = Hazard(op, self, val_shift=overlap)
-            self.t_val -= past_t_val
-        # case 6
-        #      |-- prev op --|
-        #   |-- self --|
-        else:
-            overlap = oprs - sre
-            offset_shift = srs - oprs
-            hazard = Hazard(op, self, offset_shift=offset_shift,
-                            val_shift=overlap)
-            self.t_val = past_t_offset - self.t_offset
+        hazard = self.shift_from_overlaping_delete_ranges(op, past_t_offset,
+                                                          past_t_val)
 
         return hazard

@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from ..hazards.hazard import Hazard
+
 
 class Op(object):
     """
@@ -202,6 +204,70 @@ class Op(object):
             if not self.t_path[path_index] < past_t_offset:
                 self.t_path[path_index] -= past_t_val
         return False
+
+    def shift_from_overlaping_delete_ranges(self, op,
+                                            past_t_offset, past_t_val):
+        """
+        The transformations are the same for when combining two array_deletes
+        with the same path or two string deletes in the same string. Depending
+        on if and how the delete ranges overlap, this will shift the offset and
+        val, plus create the apropriate hazards.
+        """
+
+        hazard = False
+
+        srs = self.t_offset  # self range start
+        sre = self.t_offset + self.t_val  # self range end
+        oprs = past_t_offset  # prev op range start
+        opre = past_t_offset + past_t_val  # prev op range end
+        # there are six ways two delete ranges can overlap and
+        # each one is a different case.
+
+        # case 1
+        #                |-- prev op --|
+        # |-- self --|
+        if sre <= oprs:
+            shift = self.t_val * -1
+            hazard = Hazard(op, self, offset_shift=shift)
+        # case 2
+        #   |-- prev op --|
+        #                   |-- self --|
+        elif srs >= opre:
+            self.t_offset -= past_t_val
+        # case 3
+        #   |-- prev op --|
+        #           |-- self --|
+        elif srs >= oprs and sre > opre:
+            overlap = srs - opre
+            hazard = Hazard(op, self, val_shift=overlap)
+            self.t_val += (self.t_offset - (past_t_offset + past_t_val))
+            self.t_offset = past_t_offset
+        # case 4
+        #   |--- prev op ---|
+        #     |-- self --|
+        elif srs >= oprs and sre <= opre:
+            overlap = srs - sre
+            hazard = Hazard(op, self, val_shift=overlap)
+            self.t_offset = past_t_offset
+            self.t_val = 0
+        # case 5
+        #     |-- prev op --|
+        #   |----- self ------|
+        elif sre >= opre:
+            overlap = past_t_val * -1
+            hazard = Hazard(op, self, val_shift=overlap)
+            self.t_val -= past_t_val
+        # case 6
+        #      |-- prev op --|
+        #   |-- self --|
+        else:
+            overlap = oprs - sre
+            offset_shift = srs - oprs
+            hazard = Hazard(op, self, offset_shift=offset_shift,
+                            val_shift=overlap)
+            self.t_val = past_t_offset - self.t_offset
+
+        return hazard
 
     def is_string_delete(self):
         return False

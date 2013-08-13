@@ -61,9 +61,37 @@ class ArrayDeleteOp(Op):
 
     def array_delete_transform(self, op):
         """
-        Transform this opperation when a previously unknown opperation
-        did a string deletion.
+        Transform this op when a previously unknown opperation did a string
+        deletion. If the past delete happened partially along this path, this
+        path may need to shift back at one point, or this whole op becomes a
+        noop, or nothing happens. When the two delete ops happen in the same
+        array, only their offsets and vals needs to be compared for possible
+        overlapping delete ranges (just like string deletes).
         """
         past_t_path, past_t_offset, past_t_val = \
             op.get_properties_shifted_by_hazards(self.get_changeset())
-        return False
+
+        hazard = False
+        # if this path is smaller than the old one, there's no conflict
+        if len(self.t_path) < len(past_t_path):
+            pass
+        # if they are along the same path, there may need to be a
+        # transformation, shift path or noop
+        elif len(self.t_path) > len(past_t_path) and \
+                past_t_path == self.t_path[:len(past_t_path)]:
+            delete_range = xrange(past_t_offset, past_t_offset + past_t_val)
+            if self.t_path[len(past_t_path)] in delete_range:
+                # when one of the elements in this path was previously deleted,
+                # this becomes a noop
+                self.noop = True
+            elif self.t_path[len(past_t_path)] > past_t_offset:
+                # along this path was an array that had elements deleted and
+                # that point in the path needs to shift back.
+                self.t_path[len(past_t_path)] -= past_t_val
+        elif self.t_path == past_t_path:
+            # if the paths are identical, only delete ranges need to be
+            # considered, just like overlapping string deletes.
+            hazard = self.shift_from_overlaping_delete_ranges(op,
+                                                              past_t_offset,
+                                                              past_t_val)
+        return hazard
