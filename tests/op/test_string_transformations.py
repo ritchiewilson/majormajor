@@ -16,15 +16,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Testing operational transformation with each combination of
-possible opperations.
+Testing simple operational transformation (ignoring hazards) for string
+transformations -- String Insert and String Delete
 """
 
 from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
 
-class TestOTStringInsertDelete:
+class TestStringTransformations:
     """
     Tests simple cases of string insertion and string deletes. These tests were
     created before hazards came about, so they were meant to be applied more
