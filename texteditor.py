@@ -15,10 +15,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from gi.repository import Gtk, Pango
+from gi.repository import Gtk, Pango, GObject
 from majormajor.majormajor import MajorMajor
 from majormajor.ops.op import Op
-import os
+import random, string
 
 
 class TextViewWindow(Gtk.Window):
@@ -50,6 +50,8 @@ class TextViewWindow(Gtk.Window):
         self.majormajor.connect('receive-changeset', self.receive_changeset)
         self.majormajor.connect('receive-snapshot', self.receive_snapshot)
         self.majormajor.connect('accept-invitation', self.accept_invitation)
+        self.random_insert = False
+        GObject.timeout_add(20, self.test_random_insert)
 
     def open_default_connection(self, listen_port):
         self.majormajor.open_default_connection(listen_port)
@@ -107,9 +109,36 @@ class TextViewWindow(Gtk.Window):
                 it = self.textbuffer.get_iter_at_offset(op[2] + index)
                 self.textbuffer.insert(it, op[4])
                 index += (len(op[4]) - op[3])
-                
-            
-                
+
+    def test_random_insert(self):
+        """
+        When the red button is pressed, random insert toggles on and off. When
+        it is on, this will pick a random, valid op to add to the document.
+        This will get called repeatedly on a timer to quickly fill the text
+        buffer with gibberish and see if collaboration can keep up.
+        """
+        if not self.random_insert:
+            return True
+        doc = self.document
+        old_state = doc.get_snapshot()
+        n = random.randint(1, 5)
+        o = random.randint(0, len(doc.get_snapshot()))
+        if random.random() > .3 or len(doc.get_snapshot()) == 0:
+            letters = [random.choice(string.ascii_letters + string.digits)
+                       for x in range(n)]
+            l = unicode(''.join(letters))
+            doc.add_local_op(Op('si', [], offset=o, val=l))
+        else:
+            while o + n > len(doc.get_snapshot()):
+                n -= 1
+            if o == len(doc.get_snapshot()):
+                o -= 1
+                n = 1
+            doc.add_local_op(Op('sd', [], offset=0, val=n))
+        doc.close_changeset()
+        opcodes = doc.get_diff_opcode(old_state)
+        self.receive_changeset(opcodes)
+        return True
 
     def receive_snapshot(self, snapshot):
         h_ids = self.majormajor_handlers
@@ -225,7 +254,7 @@ class TextViewWindow(Gtk.Window):
         f.close()
 
     def on_random_clicked(self, widget):
-        self.majormajor.big_insert = not self.majormajor.big_insert
+        self.random_insert = not self.random_insert
 
     def on_drop_css_clicked(self, widget):
         b = self.majormajor.drop_random_css

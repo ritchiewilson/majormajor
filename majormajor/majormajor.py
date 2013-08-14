@@ -47,38 +47,11 @@ class MajorMajor:
         # loop. Currently GObject is hardcoded in. For testing, there is no
         # event loop so HAS_EVENT_LOOP needs to be manually set to False.
         self.HAS_EVENT_LOOP = True
-        GObject.timeout_add(20, self.test_thousands_ops)
         GObject.timeout_add(500, self.pull_from_pending_lists)
         GObject.timeout_add(2000, self._retry_request_changesets)
         GObject.timeout_add(5000, self._sync_documents)
         self.big_insert = False
         self.drop_random_css = False
-
-    def test_thousands_ops(self):
-        if self.big_insert:
-            doc = self.documents[-1]
-            old_state = doc.get_snapshot()
-            import string
-            n = random.randint(1,5)
-            o = random.randint(0, len(doc.get_snapshot()))
-            if random.random() > .3 or len(doc.get_snapshot()) == 0:
-                l = unicode(''.join(random.choice(string.ascii_letters + string.digits)
-                                    for x in range(n)))
-                
-                doc.add_local_op(Op('si',[],offset=o,val=l))
-            else:
-                while o + n > len(doc.get_snapshot()):
-                    n -= 1
-                if o == len(doc.get_snapshot()):
-                    o -= 1
-                    n = 1
-                doc.add_local_op(Op('sd',[],offset=0,val=n))
-                
-            cs = doc.close_changeset()
-            opcodes = doc.get_diff_opcode(old_state)
-            for callback in self.signal_callbacks['receive-changeset']:
-                callback(opcodes)
-        return True
 
     def open_default_connection(self, port):
         """
