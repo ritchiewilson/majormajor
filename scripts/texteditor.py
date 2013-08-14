@@ -15,10 +15,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
+import random
+import string
+import sys
+import os
+
 from gi.repository import Gtk, Pango, GObject
+
+sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('..'))
 from majormajor.majormajor import MajorMajor
 from majormajor.ops.op import Op
-import random, string
 
 
 class TextViewWindow(Gtk.Window):

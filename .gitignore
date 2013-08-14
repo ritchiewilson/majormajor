@@ -1,9 +1,7 @@
-/stats.profile
-/ptexteditor.py
-/read_profile.py
-/majormajor/ptexteditor.py
-/majormajor/read_profile.py
-/majormajor/stats.profile
+scripts/stats.profile
+scripts/ptexteditor.py
+scripts/read_profile.py
+
 /.gitignore~
 *.pyc
 *.py~
