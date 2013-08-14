@@ -31,7 +31,7 @@ from gi.repository import GObject
 class MajorMajor:
     # TODO: user authentication
 
-    def __init__(self, event_loop=True):
+    def __init__(self):
         """
         On creation, create a socket to listen to UDP broadcasts on a
         default port.
@@ -44,14 +44,13 @@ class MajorMajor:
         self.requested_changesets = {}
 
         # When used as a plugin, this should be tied into an event
-        # loop. Currently GObject is hardcoded in. For testing, there
-        # is no event loop so all actions happen immediately.
-        self.HAS_EVENT_LOOP = event_loop
-        if event_loop:
-            GObject.timeout_add(20, self.test_thousands_ops)
-            GObject.timeout_add(500, self.pull_from_pending_lists)
-            GObject.timeout_add(2000, self._retry_request_changesets)
-            GObject.timeout_add(5000, self._sync_documents)
+        # loop. Currently GObject is hardcoded in. For testing, there is no
+        # event loop so HAS_EVENT_LOOP needs to be manually set to False.
+        self.HAS_EVENT_LOOP = True
+        GObject.timeout_add(20, self.test_thousands_ops)
+        GObject.timeout_add(500, self.pull_from_pending_lists)
+        GObject.timeout_add(2000, self._retry_request_changesets)
+        GObject.timeout_add(5000, self._sync_documents)
         self.big_insert = False
         self.drop_random_css = False
 
