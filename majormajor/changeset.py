@@ -304,7 +304,7 @@ class Changeset:
         op_list = []
         for op in self.ops:
             op_list.append(op.to_jsonable())
-        j = [{'doc_id': self.doc_id}, {'user':self.user},\
+        j = [{'doc_id': str(self.doc_id)}, {'user': self.user},
              {'dep':self.get_dependency_ids()}, {'ops': op_list}]
         return j
 
@@ -314,7 +314,7 @@ class Changeset:
         Build less verbose dict for just sending data. Not used for
         building id.
         """
-        d = {'doc_id': self.doc_id,
+        d = {'doc_id': str(self.doc_id),
              'user': self.user,
              'dep_ids': self.get_dependency_ids(),
              'ops': [op.to_dict() for op in self.ops]}

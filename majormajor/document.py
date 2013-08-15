@@ -31,10 +31,7 @@ class Document:
     # with it. If one is not supplied, make a random 5 character ID at
     # start
     def __init__(self, id_ = None, user=None, snapshot=None):
-        if id_ == None:
-            id_ = ''.join(random.choice(string.ascii_letters + string.digits)
-                          for x in range(5))
-        self.id_ = id_
+        self.id_ = id_ if id_ else uuid.uuid4()
         if user == None:
             user = str(uuid.uuid4())
         self.user = user

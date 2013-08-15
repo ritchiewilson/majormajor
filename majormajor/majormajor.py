@@ -103,6 +103,8 @@ class MajorMajor:
         A MajorMajor can hold multiple documents. Get the relevent
         document by doc_id.
         """
+        if isinstance(doc_id, str) or isinstance(doc_id, unicode):
+            doc_id = uuid.UUID(doc_id)
         for doc in self.documents:
             if doc.get_id() == doc_id:
                 return doc
@@ -230,7 +232,7 @@ class MajorMajor:
                 synced = True
         deps = [dep.get_id() for dep in doc.get_dependencies()]
         msg = {'action': 'sync',
-               'doc_id': doc.get_id(),
+               'doc_id': str(doc.get_id()),
                'user': self.default_user,
                'synced': synced,
                'request_css': request_css,
@@ -265,7 +267,7 @@ class MajorMajor:
         for dep in doc.get_dependencies():
             deps.append(dep.to_dict())
         msg = {'action': 'send_snapshot',
-               'doc_id': doc.get_id(),
+               'doc_id': str(doc.get_id()),
                'user': self.default_user,
                'snapshot': doc.get_snapshot(),
                'deps': deps,
@@ -301,7 +303,7 @@ class MajorMajor:
         """
         
         msg = {'action': 'request_history',
-               'doc_id': doc.get_id(),
+               'doc_id': str(doc.get_id()),
                'user': doc.get_user(),
                'new_cs_ids': [cs.get_id() for cs in new_css ],
                'last_known_cs_ids': [cs.get_id() for cs in last_known_css]
@@ -320,7 +322,7 @@ class MajorMajor:
         css = doc.get_changesets_in_ranges(m['last_known_cs_ids'],
                                           m['new_cs_ids'])
         msg = {'action': 'send_history',
-               'doc_id': doc.get_id(),
+               'doc_id': str(doc.get_id()),
                'user': doc.get_user(),
                'history': [cs.to_dict() for cs in css]
                }
@@ -347,7 +349,7 @@ class MajorMajor:
         doc = self.get_document_by_id(m['doc_id'])
         if doc:
             return
-        doc = self.new_document(m['doc_id'])
+        doc = self.new_document(uuid.UUID(m['doc_id']))
         user = self.get_user_by_id(uuid.UUID(m['user']))
         msg = self.request_snapshot(doc, user)
         for callback in self.signal_callbacks['accept-invitation']:
@@ -360,7 +362,7 @@ class MajorMajor:
         """
         msg = {'action': 'request_snapshot',
                'user': self.default_user,
-               'doc_id': doc.get_id()}
+               'doc_id': str(doc.get_id())}
         self.broadcast(msg, users=[user])
         return msg
 
@@ -388,7 +390,7 @@ class MajorMajor:
         msg = {"action": "invite_to_document",
                "to_user": str(to_user.get_id()),
                "user": self.default_user,
-               "doc_id": doc.get_id()}
+               "doc_id": str(doc.get_id())}
         self.broadcast(msg, [to_user])
         return msg
 
@@ -400,7 +402,7 @@ class MajorMajor:
             return
         msg = {"action": "request_changesets",
                "user": self.default_user,
-               "doc_id": doc.get_id(),
+               "doc_id": str(doc.get_id()),
                'cs_ids': cs_ids,
                "request_ancestors": request_ancestors}
         if request_ancestors:
@@ -436,7 +438,7 @@ class MajorMajor:
                         if doc.knows_changeset(cs)]
         msg = {"action":"send_changesets",
                "user":self.default_user,
-               "doc_id":doc.get_id(),
+               "doc_id": str(doc.get_id()),
                'css':css_data}
         users = self.remote_users.values()
         self.broadcast(msg, users=users)
