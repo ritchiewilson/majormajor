@@ -108,18 +108,6 @@ class MajorMajor:
                 return doc
         return None
 
-    def send_changeset(self, cs):
-        """
-        Build the message object to send to other collaborators.
-        """
-        msg = {'action':'send_changeset',
-               'cs':cs.to_dict(),
-               'cs_id': cs.get_id(),
-               'user':cs.get_user(),
-               'doc_id':cs.get_doc_id()}
-        self.broadcast(msg, broadcast=True)
-        return msg
-
     def _listen_callback(self, msg):
         """
         Whenever a socket is written to, this callback handles the
