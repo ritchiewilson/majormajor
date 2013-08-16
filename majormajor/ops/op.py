@@ -117,6 +117,8 @@ class Op(object):
         to be transformed to accomidate pc.
         """
         for op in pc.get_ops():
+            if op.is_noop():
+                continue
             func_name = self.json_opperations[op.action]
             transform_function = getattr(self, func_name)
             hazard = transform_function(op)
@@ -250,6 +252,7 @@ class Op(object):
             hazard = Hazard(op, self, val_shift=overlap)
             self.t_offset = past_t_offset
             self.t_val = 0
+            self.noop = True
         # case 5
         #     |-- prev op --|
         #   |----- self ------|

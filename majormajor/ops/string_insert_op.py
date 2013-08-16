@@ -71,6 +71,7 @@ class StringInsertOp(Op):
             self.t_offset = past_t_offset
             vs = len(self.t_val)
             self.t_val = ''
+            self.noop = True
             hazard = Hazard(op, self, val_shift=vs)
         else:
             hazard = Hazard(op, self, offset_shift=len(self.t_val))
