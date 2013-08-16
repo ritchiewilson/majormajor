@@ -311,7 +311,7 @@ win.show_all()
 if args.port or (not args.port and not args.mq):
     port = args.port if args.port else 8000
     win.open_default_connection(port)
-elif args.mq:
+if args.mq:
     win.open_mq_connection()
 
 Gtk.main()
