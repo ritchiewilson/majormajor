@@ -344,31 +344,28 @@ class Document:
         self.rebuild_snapshot()
         return True
 
-        
-    def receive_snapshot(self, m):
+    def receive_snapshot(self, snapshot, root_dict, dep_dicts):
         """
         m is the dict coming straight from another user over
         the tubes.
         """
-        self.root_changeset = build_changeset_from_dict(m['root'], self)
-        deps = m['deps']
+        self.root_changeset = build_changeset_from_dict(root_dict, self)
         new_css = []
-        for dep in deps:
+        for dep in dep_dicts:
             new_cs = build_changeset_from_dict(dep, self)
             if new_cs.get_id() == self.root_changeset.get_id():
                 new_cs = self.root_changeset
             new_css.append(new_cs)
-            
-        self.set_snapshot(m['snapshot'], new_css)
+
+        self.set_snapshot(snapshot, new_css)
         if [self.root_changeset] == self.dependencies:
             self.ordered_changesets = [self.root_changeset]
             self.ordered_changesets_set_cache = set([self.root_changeset])
 
-
-    def receive_history(self, m):
-        for cs in m['history']:
+    def receive_history(self, cs_dicts):
+        for cs in cs_dicts:
             # build historical changeset
-            hcs = build_changeset_from_dict(cs,self)
+            hcs = build_changeset_from_dict(cs, self)
             if hcs.get_parents() == []:
                 self.root_changeset = hcs
             self.add_to_known_changesets(hcs)

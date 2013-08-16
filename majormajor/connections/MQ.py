@@ -15,11 +15,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import json, random
-from connection import Connection
+import json
+import random
+
 from gi.repository import GObject
 import pika
 
+from connection import Connection
+from ..message import Message
 
 class RabbitMQConnection(Connection):
     def __init__(self, callback=None):
@@ -66,7 +69,8 @@ class RabbitMQConnection(Connection):
             method_frame, header_frame, body \
                 = self.channel.basic_get(queue=q, no_ack=True)
             if body and not method_frame.NAME == 'Basic.GetEmpty':
-                msg = json.loads(body)
+                m = json.loads(body)
+                msg = Message(msg=m)
                 self.on_receive_callback(msg)
                 break
         return True
@@ -89,7 +93,7 @@ class RabbitMQConnection(Connection):
         if broadcast:
             q_list += self.global_write_queues
 
-        json_msg = json.dumps(msg)
+        json_msg = msg.to_json()
         for q in q_list:
             self.channel.basic_publish(exchange='',
                                        routing_key=q,

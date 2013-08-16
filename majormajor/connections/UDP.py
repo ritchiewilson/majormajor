@@ -16,10 +16,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from connection import Connection
-import socket, json, uuid
+import socket
+import json
+import uuid
 from datetime import datetime
+
 from gi.repository import GObject
-from collections import defaultdict
+
+from ..message import Message
 
 class UDPBroadcastConnection(Connection):
     host = '<broadcast>'
@@ -61,7 +65,7 @@ class UDPBroadcastConnection(Connection):
         TODO: Messages should be split by bytes, not characters (unicode)
         
         """
-        full_msg = json.dumps(msg)
+        full_msg = msg.to_json()
         msg_id = str(uuid.uuid4())
         chunk_size = 1000
         chunks = [full_msg[i:i+chunk_size] \
@@ -96,7 +100,8 @@ class UDPBroadcastConnection(Connection):
 
         if full_msg:
             m = json.loads(full_msg)
-            self.on_receive_callback(m)
+            msg = Message(msg=m)
+            self.on_receive_callback(msg)
             self.received_msg_chunks.pop(msg_id, None)
         return True
 
