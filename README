@@ -23,9 +23,8 @@ or over http:
 Sample Text Editor
 ------------------
 
-Try the sample text editor:
+Try the sample text editor in the scripts directory:
 ```
-$ cd majormajor/majormajor
 $ python texteditor.py
 ```
 
