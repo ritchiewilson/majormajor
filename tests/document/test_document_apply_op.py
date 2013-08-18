@@ -263,23 +263,28 @@ class TestDocumentApplyOp:
     def test_object_insert(self):
         doc0 = self.doc0
         doc1 = self.doc1
-        doc2 = self.doc2
 
         # whole doc is a dict. insert a key val pair
-        kv1 = {'key':'a', 'val':1}
-        op1 = Op('oi', [], val=kv1)
+        op1 = Op('oi', [], offset='a', val=1)
         doc0.apply_op(op1)
-        assert doc0.snapshot == {'a':1}
-        kv2 = {'key':'b', 'val':2}
-        op2 = Op('oi', [], val=kv2)
+        assert doc0.snapshot == {'a': 1}
+        op2 = Op('oi', [], offset='b', val=2)
         doc0.apply_op(op2)
-        assert doc0.snapshot == {'a':1, 'b':2}
+        assert doc0.snapshot == {'a': 1, 'b': 2}
 
         # nested dicts
-        op3 = Op('oi', ['fifth',2], val=kv1)
+        op3 = Op('oi', ['fifth', 2], offset='a', val=1)
         doc1.apply_op(op3)
         result3 = {'sixth': 'deep string', 'a': 1}
-        assert doc1.get_value(['fifth',2]) == result3
+        assert doc1.get_value(['fifth', 2]) == result3
+
+        # complex vals
+        v = {'X': 'Y', 'Z': [1, 2, 3]}
+        op4 = Op('oi', [], offset='c', val=v)
+        doc0.apply_op(op4)
+        assert doc0.get_snapshot() == {'a': 1,
+                                       'b': 2,
+                                       'c': {'X': 'Y', 'Z': [1, 2, 3]}}
 
     def test_object_delete(self):
         doc1 = self.doc1

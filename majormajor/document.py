@@ -680,12 +680,12 @@ class Document:
 
     def object_insert(self, op):
         cur = self.get_value(op.path)
-        cur[op.val['key']]  = op.val['val']
+        cur[op.t_offset]  = op.t_val
         return cur
 
     def object_delete(self, op):
-        cur = self.get_value(op.path)
-        cur.pop(op.offset)
+        cur = self.get_value(op.t_path)
+        cur.pop(op.t_offset)
         return cur
 
     json_opperations = {
