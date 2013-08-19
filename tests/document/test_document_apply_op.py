@@ -18,24 +18,29 @@
 from majormajor.document import Document
 from majormajor.ops.op import Op
 
+
 class TestDocumentApplyOp:
     def setup_method(self, method):
         self.doc0 = Document()
         self.doc1 = Document()
-        self.doc1.snapshot = {'first': 'some string',
-                            'second': {'third':'more string',
-                                       'fourth':{'numb':55}},
-                            'fifth': [55,66,{'sixth': 'deep string'}, 'rw']}
+        doc1_snap = {'first': 'some string',
+                     'second': {'third': 'more string',
+                                'fourth': {'numb': 55}},
+                     'fifth': [55, 66, {'sixth': 'deep string'}, 'rw']}
+        self.doc1.snapshot.set_snapshot(doc1_snap)
+        
         self.doc2 = Document()
-        self.doc2.snapshot = [{'name':'value'},
-                              [1,2,3,4],
-                              'normal, ol string',
-                              [['multi'],['dimen'],['array']],
-                              True,
-                              None,
-                              42]
+        doc2_snap = [{'name': 'value'},
+                     [1, 2, 3, 4],
+                     'normal, ol string',
+                     [['multi'], ['dimen'], ['array']],
+                     True,
+                     None,
+                     42]
+        self.doc2.snapshot.set_snapshot(doc2_snap)
+
         self.doc3 = Document()
-        self.doc3.snapshot = 'ABCDEFG'
+        self.doc3.snapshot.set_snapshot('ABCDEFG')
 
     def test_set_value(self):
         doc0 = self.doc0
@@ -44,11 +49,11 @@ class TestDocumentApplyOp:
 
         # change value type of whole document
         doc0.apply_op(Op('set', [], val='ABCDEFG'))
-        assert doc0.snapshot == 'ABCDEFG'
+        assert doc0.get_snapshot() == 'ABCDEFG'
         doc0.apply_op(Op('set', [], val=None))
-        assert doc0.snapshot == None
+        assert doc0.get_snapshot() is None
         doc0.apply_op(Op('set', [], val=False))
-        assert doc0.snapshot == False
+        assert doc0.get_snapshot() is False
 
         # simple, first level dict key/val change
         op1 = Op('set', ['first'], val='newval')
@@ -75,17 +80,17 @@ class TestDocumentApplyOp:
         assert doc2.get_value([3,2,0]) == 5
 
     def test_boolean_negation(self):
-        doc0 =  Document()
-        doc0.snapshot = False
+        doc0 = Document()
+        doc0.snapshot.set_snapshot(False)
         doc1 = self.doc1
         doc2 = self.doc2
 
         # whole document is a boolean. Just change that
         op1 = Op('bn', [])
         doc0.apply_op(op1)
-        assert doc0.snapshot == True
+        assert doc0.get_snapshot() is True
         doc0.apply_op(op1)
-        assert doc0.snapshot == False
+        assert doc0.get_snapshot() is False
 
         # boolean at some key/index
         op2 = Op('bn', [4])
@@ -105,14 +110,14 @@ class TestDocumentApplyOp:
 
     def test_number_add(self):
         doc0 =  Document()
-        doc0.snapshot = 0
+        doc0.snapshot.set_snapshot(0)
         doc1 = self.doc1
         doc2 = self.doc2
 
         # whole document is just a number. Alter it.
         op1 = Op('na', [], val=5)
         doc0.apply_op(op1)
-        assert doc0.snapshot == 5
+        assert doc0.get_snapshot() == 5
 
         # number deeper in doc
         op2 = Op('na', ['fifth',1], val=-100)
@@ -134,15 +139,15 @@ class TestDocumentApplyOp:
         # add string to end
         op1 = Op('si', [], val='end', offset=7)
         doc3.apply_op(op1)
-        assert doc3.snapshot == 'ABCDEFGend'
+        assert doc3.get_snapshot() == 'ABCDEFGend'
         # insert in middle
         op2 = Op('si', [], val=' word ', offset=3)
         doc3.apply_op(op2)
-        assert doc3.snapshot == 'ABC word DEFGend'
+        assert doc3.get_snapshot() == 'ABC word DEFGend'
         # insert at start
         op3 = Op('si', [], val='start', offset=0)
         doc3.apply_op(op3)
-        assert doc3.snapshot == 'startABC word DEFGend'
+        assert doc3.get_snapshot() == 'startABC word DEFGend'
 
         # something in nested dict
         op4 = Op('si', [3,1,0], offset=5, val='sional')
@@ -158,15 +163,15 @@ class TestDocumentApplyOp:
         # delete last character
         op1 = Op('sd', [], val=1, offset=6)
         doc3.apply_op(op1)
-        assert doc3.snapshot == 'ABCDEF'
+        assert doc3.get_snapshot() == 'ABCDEF'
         # delete in middle
         op2 = Op('sd', [], val=2, offset=3)
         doc3.apply_op(op2)
-        assert doc3.snapshot == 'ABCF'
+        assert doc3.get_snapshot() == 'ABCF'
         # delete first two letters
         op3 = Op('sd', [], val=2, offset=0)
         doc3.apply_op(op3)
-        assert doc3.snapshot == 'CF'
+        assert doc3.get_snapshot() == 'CF'
 
         # something deep in doc
         op4 = Op('sd', [3,1,0], val=2, offset=3)
@@ -175,26 +180,26 @@ class TestDocumentApplyOp:
 
     def test_array_insert(self):
         doc0 = Document()
-        doc0.snapshot = []
+        doc0.snapshot.set_snapshot([])
         doc1 = self.doc1
         doc2 = self.doc2
 
         # whole doc is just an empty array. alter it
         op1 = Op('ai', [], val=['c'], offset=0)
         doc0.apply_op(op1)
-        assert doc0.snapshot == ['c']
+        assert doc0.get_snapshot() == ['c']
         # insert at start
         op2 = Op('ai', [], val=['a'], offset=0)
         doc0.apply_op(op2)
-        assert doc0.snapshot == ['a', 'c']
+        assert doc0.get_snapshot() == ['a', 'c']
         # insert at end
         op3 = Op('ai', [], val=['d'], offset=2)
         doc0.apply_op(op3)
-        assert doc0.snapshot == ['a', 'c', 'd']
+        assert doc0.get_snapshot() == ['a', 'c', 'd']
         # insert several in the middle
         op4 = Op('ai', [], val=['b0', 'b1', 'b2'], offset=1)
         doc0.apply_op(op4)
-        assert doc0.snapshot == ['a', 'b0', 'b1', 'b2', 'c', 'd']
+        assert doc0.get_snapshot() == ['a', 'b0', 'b1', 'b2', 'c', 'd']
 
         # insert into some array deep in doc
         op5 = Op('ai', [3, 1], val=['a'], offset=1)
@@ -209,14 +214,14 @@ class TestDocumentApplyOp:
 
     def test_array_delete(self):
         doc0 =  Document()
-        doc0.snapshot = []
+        doc0.snapshot.set_snapshot([])
         doc1 = self.doc1
         doc2 = self.doc2
 
         # can technically delete nothing from empty list. why not
         op1 = Op('ad', [], offset=0, val=0)
         doc0.apply_op(op1)
-        assert doc0.snapshot == []
+        assert doc0.get_snapshot() == []
 
         # remove one from list
         op2 = Op('ad', [], offset=1, val=1)
@@ -231,12 +236,12 @@ class TestDocumentApplyOp:
         # delete multiple elements
         op4 = Op('ad', [], offset=0, val=4)
         doc2.apply_op(op4)
-        assert doc2.snapshot == [None, 42]
+        assert doc2.get_snapshot() == [None, 42]
 
         # delete last in list:
         op5 = Op('ad', [], offset=1, val=1)
         doc2.apply_op(op5)
-        assert doc2.snapshot == [None]
+        assert doc2.get_snapshot() == [None]
 
         # in dicts
         op6 = Op('ad', ['fifth'], offset=2, val=2)
@@ -252,7 +257,7 @@ class TestDocumentApplyOp:
         doc2.apply_op(op1)
         result1 = [{'name':'value'},'normal, ol string', [1,2,3,4],
                    [['multi'],['dimen'],['array']], True, None,42]
-        assert doc2.snapshot == result1
+        assert doc2.get_snapshot() == result1
 
         # Move to end of list
         op2 = Op('am', ['fifth'], offset=0, val=3)
@@ -267,10 +272,10 @@ class TestDocumentApplyOp:
         # whole doc is a dict. insert a key val pair
         op1 = Op('oi', [], offset='a', val=1)
         doc0.apply_op(op1)
-        assert doc0.snapshot == {'a': 1}
+        assert doc0.get_snapshot() == {'a': 1}
         op2 = Op('oi', [], offset='b', val=2)
         doc0.apply_op(op2)
-        assert doc0.snapshot == {'a': 1, 'b': 2}
+        assert doc0.get_snapshot() == {'a': 1, 'b': 2}
 
         # nested dicts
         op3 = Op('oi', ['fifth', 2], offset='a', val=1)
@@ -295,12 +300,12 @@ class TestDocumentApplyOp:
         doc1.apply_op(op1)
         result1 = {'first': 'some string',
                    'fifth': [55,66,{'sixth': 'deep string'}, 'rw']}
-        assert doc1.snapshot == result1
+        assert doc1.get_snapshot() == result1
 
         # nested
         op2 = Op('od', ['fifth',2], offset='sixth')
         doc1.apply_op(op2)
         result2 = {'first': 'some string',
                    'fifth': [55,66,{}, 'rw']}
-        assert doc1.snapshot == result2
+        assert doc1.get_snapshot() == result2
 

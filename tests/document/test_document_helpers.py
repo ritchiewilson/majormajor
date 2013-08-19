@@ -125,8 +125,8 @@ class TestDocumentHelpers:
 
         path1 = []
         assert doc0.get_node(path1) == {}
-        assert doc1.get_node(path1) == doc1.snapshot
-        assert doc2.get_node(path1) == doc2.snapshot
+        assert doc1.get_node(path1) == doc1.get_snapshot()
+        assert doc2.get_node(path1) == doc2.get_snapshot()
         
         path2 = ['first']
         assert doc1.get_value(path2) == 'some string'

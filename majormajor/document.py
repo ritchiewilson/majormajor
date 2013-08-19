@@ -18,11 +18,11 @@
 import difflib
 import random
 import uuid
-import copy
 from datetime import datetime
 
 from changeset import Changeset
 from ops.op import Op
+from snapshot import Snapshot
 from utils import build_changeset_from_dict
 
 
@@ -41,7 +41,7 @@ class Document:
         self.send_queue = []
         self.pending_new_changesets = []
         self.open_changeset = None
-        self.snapshot = {}
+        self.snapshot = Snapshot()
         self.root_changeset = None
         self.dependencies = []
         # set initial snapshot if called upon
@@ -121,7 +121,7 @@ class Document:
         return cs_in_range  # TODO needed?
 
     def get_snapshot(self):
-        return self.snapshot
+        return self.snapshot.get_snapshot()
 
     def get_changesets(self):
         return self.changesets
@@ -187,7 +187,7 @@ class Document:
         and all previously known changesets are put in the pending
         list until they can be sorted back in.
         """
-        self.snapshot = snapshot
+        self.snapshot.set_snapshot(snapshot)
         for dep in deps:
             self.add_to_known_changesets(dep)
         self.dependencies = deps
@@ -251,7 +251,7 @@ class Document:
         # randomly select if if this changeset should be a cache
         if random.random() < 0.1:
             cs.set_as_snapshot_cache(True)
-            cs.set_snapshot_cache(copy.deepcopy(self.snapshot))
+            cs.set_snapshot_cache(self.snapshot.get_snapshot_copy())
             cs.set_snapshot_cache_is_valid(True)
         return cs
 
@@ -431,19 +431,22 @@ class Document:
         Start from an empty {} document and rebuild it from each op in
         each changeset.
         """
-        while index > 0 and not self.ordered_changesets[index].has_valid_snapshot_cache():
+        s = self.snapshot
+        ocs = self.ordered_changesets
+        while index > 0 and not ocs[index].has_valid_snapshot_cache():
             index -= 1
         if index == 0:
-            self.snapshot = {}
+            s.set_snapshot = {}
         else:
-            self.snapshot = self.ordered_changesets[index].get_snapshot_cache()
+            s.set_snapshot(ocs[index].get_snapshot_cache())
             index += 1
         while index < len(self.ordered_changesets):
-            for op in self.ordered_changesets[index].get_ops():
-                self.apply_op(op)
-            if self.ordered_changesets[index].is_snapshot_cache():
-                self.ordered_changesets[index].set_snapshot_cache(copy.deepcopy(self.snapshot))
-                self.ordered_changesets[index].set_snapshot_cache_is_valid(True)
+            cs = ocs[index]
+            for op in cs.get_ops():
+                s.apply_op(op)
+            if cs.is_snapshot_cache():
+                cs.set_snapshot_cache(self.snapshot.get_snapshot_copy())
+                cs.set_snapshot_cache_is_valid(True)
             index += 1
 
     def update_unaccounted_changesets(self, cs, index=None):
@@ -591,112 +594,16 @@ class Document:
         return opcodes
 
     def contains_path(self, path):
-        """ Checks if the given path is valid in this document's snapshot """
-        node = self.snapshot
-        for i in path:
-            if isinstance(i, str):
-                if not isinstance(node, dict):
-                    return False
-                if not i in node:
-                    return False
-            elif isinstance(i, int):
-                if not isinstance(node, list):
-                    return False
-                if i >= len(node):
-                    return False
-            node = node[i]
-        return True
+        """
+        Checks if the given path is valid in this document's snapshot.
+        """
+        return self.snapshot.contains_path(path)
 
     def get_node(self, path):
-        node = self.snapshot
-        if len(path) != 0:
-            for i in path[:-1]:
-                node = node[i]
-        return node
+        return self.snapshot.get_node(path)
 
     def get_value(self, path):
-        if len(path) == 0:
-            return self.snapshot
-        return self.get_node(path)[path[-1]]
+        return self.snapshot.get_value(path)
 
     def apply_op(self, op):
-        if not self.contains_path(op.path):
-            return "ERROR!"
-
-        func_name = self.json_opperations[op.action]
-        func = getattr(self, func_name)
-        if len(op.path) == 0:
-            self.snapshot = func(op)
-        else:
-            node = self.get_node(op.path)
-            node[op.path[-1]] = func(op)
-
-    # JSON Opperation - wholesale replacing value at a given path
-    def set_value(self, op):
-        return op.val
-
-    # JSON Opperation - Flip the value of the boolean at the given path
-    def boolean_negation(self, op):
-        cur = self.get_value(op.path)
-        return False if cur else True
-
-    # JSON Opperation - Add some constant value to the number at the given path
-    def number_add(self, op):
-        return self.get_value(op.path) + op.val
-
-    # JSON Opperation - Insert characters into a string at the given
-    # path, and at the given offset within that string.
-    def string_insert(self, op):
-        cur = self.get_value(op.t_path)
-        return  cur[:op.t_offset] + op.t_val + cur[op.t_offset:]
-
-    # JSON Opperation - Delete given number of characters from a
-    # string at the given path, and at the given offset within that
-    # string.
-    def string_delete(self, op):
-        cur = self.get_value(op.t_path)
-        return cur[:op.t_offset] + cur[op.t_offset + op.t_val:]
-
-    def array_insert(self, op):
-        cur = self.get_value(op.t_path)
-        r = cur[:op.t_offset]
-        r.extend(op.t_val)
-        r.extend(cur[op.t_offset:])
-        return r
-
-    def array_delete(self, op):
-        cur = self.get_value(op.t_path)
-        r = cur[:op.t_offset]
-        r.extend(cur[op.t_offset + op.t_val:])
-        return r
-
-    def array_move(self, op):
-        cur = self.get_value(op.path)
-        item = cur.pop(op.offset)
-        r = cur[:op.val]
-        r.append(item)
-        r.extend(cur[op.val:])
-        return r
-
-    def object_insert(self, op):
-        cur = self.get_value(op.t_path)
-        cur[op.t_offset]  = op.t_val
-        return cur
-
-    def object_delete(self, op):
-        cur = self.get_value(op.t_path)
-        cur.pop(op.t_offset)
-        return cur
-
-    json_opperations = {
-        'set': 'set_value',
-        'bn': 'boolean_negation',
-        'na': 'number_add',
-        'si': 'string_insert',
-        'sd': 'string_delete',
-        'ai': 'array_insert',
-        'ad': 'array_delete',
-        'am': 'array_move',
-        'oi': 'object_insert',
-        'od': 'object_delete'
-    }
+        self.snapshot.apply_op(op)
