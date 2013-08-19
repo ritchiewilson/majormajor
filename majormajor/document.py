@@ -658,16 +658,16 @@ class Document:
         return cur[:op.t_offset] + cur[op.t_offset + op.t_val:]
 
     def array_insert(self, op):
-        cur = self.get_value(op.path)
-        r = cur[:op.offset]
-        r.extend(op.val)
-        r.extend(cur[op.offset:])
+        cur = self.get_value(op.t_path)
+        r = cur[:op.t_offset]
+        r.extend(op.t_val)
+        r.extend(cur[op.t_offset:])
         return r
 
     def array_delete(self, op):
-        cur = self.get_value(op.path)
-        r = cur[:op.offset]
-        r.extend(cur[op.offset + op.val:])
+        cur = self.get_value(op.t_path)
+        r = cur[:op.t_offset]
+        r.extend(cur[op.t_offset + op.t_val:])
         return r
 
     def array_move(self, op):
@@ -679,7 +679,7 @@ class Document:
         return r
 
     def object_insert(self, op):
-        cur = self.get_value(op.path)
+        cur = self.get_value(op.t_path)
         cur[op.t_offset]  = op.t_val
         return cur
 
