@@ -28,6 +28,8 @@ class Op(object):
                     'sd': StringDeleteOp,
                     'ai': ArrayInsertOp,
                     'ad': ArrayDeleteOp,
+                    'oi': ObjectInsertOp,
+                    'od': ObjectDeleteOp,
                     'set': SetOp }.get(args[0], cls)
         
         new_instance = object.__new__(subclass, *args, **kwargs)
@@ -207,6 +209,27 @@ class Op(object):
                 self.t_path[path_index] -= past_t_val
         return False
 
+    def object_insert_transform(self, op):
+        """
+        This op is being transformed by a previously unknown object insert. The
+        result is either no change, or switch to noop
+        """
+        past_t_path, past_t_offset, past_t_val = \
+            op.get_properties_shifted_by_hazards(self.get_changeset())
+        r = self.object_transformation(past_t_path, past_t_offset, past_t_val)
+        return r
+
+    def object_delete_transform(self, op):
+        """
+        Transform this opperation when a previously unknown opperation did an
+        object deletion. Either this is fine or a noop.
+        """
+        past_t_path, past_t_offset, past_t_val = \
+            op.get_properties_shifted_by_hazards(self.get_changeset())
+
+        r = self.object_transformation(past_t_path, past_t_offset, past_t_val)
+        return r
+
     def shift_from_overlaping_delete_ranges(self, op,
                                             past_t_offset, past_t_val):
         """
@@ -272,6 +295,26 @@ class Op(object):
 
         return hazard
 
+    def object_transformation(self, past_t_path, past_t_offset, past_t_val):
+        """
+        For any object transformations, the results are the same. Either 1)
+        there is no conflict and the previous op does nothing or 2) there is a
+        conflict and the prev op forces this to be a noop.
+        """
+        # when this path is shorter than the old one, nothing needs to be done.
+        if len(self.t_path) < len(past_t_path):
+            pass
+
+        # when the paths are exactly equal, this offset may need to shift up
+        elif past_t_path == self.t_path:
+            if past_t_offset == self.t_offset:
+                self.noop = True
+        # otherwise the path may need to shift
+        elif past_t_path == self.t_path[:len(past_t_path)]:
+            if past_t_offset == self.t_path[len(past_t_path)]:
+                self.noop = True
+        return False
+
     def is_string_delete(self):
         return False
 
@@ -306,3 +349,5 @@ from string_insert_op import StringInsertOp
 from string_delete_op import StringDeleteOp
 from array_insert_op import ArrayInsertOp
 from array_delete_op import ArrayDeleteOp
+from object_insert_op import ObjectInsertOp
+from object_delete_op import ObjectDeleteOp
