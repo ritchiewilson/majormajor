@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from ..hazards.hazard import Hazard
-from op import Op
+from .op import Op
 
 
 class ArrayInsertOp(Op):

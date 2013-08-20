@@ -21,7 +21,7 @@ import random
 from gi.repository import GObject
 import pika
 
-from connection import Connection
+from .connection import Connection
 from ..message import Message
 
 class RabbitMQConnection(Connection):

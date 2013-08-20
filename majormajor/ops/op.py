@@ -355,10 +355,10 @@ class Op(object):
 class SetOp(Op):
     pass
     
-from string_insert_op import StringInsertOp
-from string_delete_op import StringDeleteOp
-from string_move_op import StringMoveOp
-from array_insert_op import ArrayInsertOp
-from array_delete_op import ArrayDeleteOp
-from object_insert_op import ObjectInsertOp
-from object_delete_op import ObjectDeleteOp
+from .string_insert_op import StringInsertOp
+from .string_delete_op import StringDeleteOp
+from .string_move_op import StringMoveOp
+from .array_insert_op import ArrayInsertOp
+from .array_delete_op import ArrayDeleteOp
+from .object_insert_op import ObjectInsertOp
+from .object_delete_op import ObjectDeleteOp

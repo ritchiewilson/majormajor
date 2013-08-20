@@ -15,15 +15,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from document import Document
-from user import User
-from message import Message
 import copy
 import uuid
 from datetime import datetime
 import random
 
 from gi.repository import GObject
+
+from .document import Document
+from .user import User
+from .message import Message
 
 
 class MajorMajor:
@@ -56,13 +57,13 @@ class MajorMajor:
         Hard coded hack for testing purposes. Default connection is
         sending json by broadcasting UDP over the local network.
         """
-        from connections.UDP import UDPBroadcastConnection
+        from .connections.UDP import UDPBroadcastConnection
         c = UDPBroadcastConnection(callback=self._listen_callback,
                                    listen_port=port)
         self.connections.append(c)
 
     def open_mq_connection(self):
-        from connections.MQ import RabbitMQConnection
+        from .connections.MQ import RabbitMQConnection
         c = RabbitMQConnection(callback=self._listen_callback)
         self.connections.append(c)
 

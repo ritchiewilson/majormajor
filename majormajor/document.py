@@ -20,10 +20,10 @@ import random
 import uuid
 from datetime import datetime
 
-from changeset import Changeset
-from ops.op import Op
-from snapshot import Snapshot
-from utils import build_changeset_from_dict
+from .changeset import Changeset
+from .ops.op import Op
+from .snapshot import Snapshot
+from .utils import build_changeset_from_dict
 
 
 class Document:
