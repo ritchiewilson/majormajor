@@ -48,22 +48,6 @@ class TestDocumentHelpers:
     def test_get_id(self):
         doc = Document('abc456')
         assert doc.get_id() == 'abc456'
-
-    def test_get_last_changeset(self):
-        assert self.doc0.get_last_changeset() == self.doc0.get_root_changeset()
-
-        # add a changeset and make sure it ends up last
-        self.doc0.add_local_op(Op('set',[],val='abc'))
-        open_changeset = self.doc0.get_open_changeset()
-        self.doc0.close_changeset()
-        assert open_changeset == self.doc0.get_last_changeset()
-
-        # do it again
-        self.doc0.add_local_op(Op('set',[],val='abc'))
-        assert open_changeset == self.doc0.get_last_changeset()
-        new_open_changeset = self.doc0.get_open_changeset()
-        self.doc0.close_changeset()
-        assert new_open_changeset == self.doc0.get_last_changeset()
         
     # Testing that Document can tell if a path is valid in its
     # snapshot without throwing any exceptions

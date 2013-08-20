@@ -60,9 +60,6 @@ class Document:
     def get_user(self):
         return self.user
 
-    def get_last_changeset(self):
-        return self.ordered_changesets[-1] if self.ordered_changesets else None
-
     def get_root_changeset(self):
         return self.root_changeset
 
