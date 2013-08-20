@@ -26,6 +26,7 @@ class Op(object):
     def __new__(cls, *args, **kwargs):
         subclass = {'si': StringInsertOp,
                     'sd': StringDeleteOp,
+                    'sm': StringMoveOp,
                     'ai': ArrayInsertOp,
                     'ad': ArrayDeleteOp,
                     'oi': ObjectInsertOp,
@@ -34,9 +35,9 @@ class Op(object):
         
         new_instance = object.__new__(subclass, *args, **kwargs)
         return new_instance
-        
-        
-    def __init__(self, action, path, val=None, offset=None):
+
+    def __init__(self, action, path, val=None, offset=None,
+                 dest_path=None, dest_offset=None):
         # These are the canonical original intentions. They are what's
         # actually stored in databases and sent to peers. Once set,
         # these values should not change.
@@ -44,6 +45,8 @@ class Op(object):
         self.path = path
         self.val = val
         self.offset = offset
+        self.dest_path = dest_path
+        self.dest_offset = dest_offset
 
         # These are copies, which are allowed to change based on
         # opperational transformations.
@@ -51,6 +54,8 @@ class Op(object):
         self.t_path = path
         self.t_val = val
         self.t_offset = offset
+        self.t_dest_path = dest_path
+        self.t_dest_offset = dest_offset
         self.noop = False
 
         self.changeset = None
@@ -110,8 +115,10 @@ class Op(object):
         self.t_path = self.path
         self.t_val = self.val
         self.t_offset = self.offset
+        self.t_dest_path = self.dest_path
+        self.t_dest_offset = self.dest_offset
         self.noop = False
-        
+
     def ot(self, pc):
         """
         pc: Changeset - previous changeset which has been applied but
@@ -321,6 +328,9 @@ class Op(object):
     def is_string_insert(self):
         return False
 
+    def is_string_move(self):
+        return False
+
     def is_array_insert(self):
         return False
 
@@ -347,6 +357,7 @@ class SetOp(Op):
     
 from string_insert_op import StringInsertOp
 from string_delete_op import StringDeleteOp
+from string_move_op import StringMoveOp
 from array_insert_op import ArrayInsertOp
 from array_delete_op import ArrayDeleteOp
 from object_insert_op import ObjectInsertOp

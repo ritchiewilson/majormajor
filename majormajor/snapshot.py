@@ -71,16 +71,19 @@ class Snapshot:
         return self.get_node(path)[path[-1]]
 
     def apply_op(self, op):
-        if not self.contains_path(op.path):
+        if not self.contains_path(op.t_path):
             return "ERROR!"
 
+        if op.is_string_move():
+            self.string_move(op)
+            return
         func_name = self.json_opperations[op.action]
         func = getattr(self, func_name)
-        if len(op.path) == 0:
+        if len(op.t_path) == 0:
             self.snapshot = func(op)
         else:
-            node = self.get_node(op.path)
-            node[op.path[-1]] = func(op)
+            node = self.get_node(op.t_path)
+            node[op.t_path[-1]] = func(op)
 
     # JSON Opperation - wholesale replacing value at a given path
     def set_value(self, op):
@@ -88,12 +91,12 @@ class Snapshot:
 
     # JSON Opperation - Flip the value of the boolean at the given path
     def boolean_negation(self, op):
-        cur = self.get_value(op.path)
+        cur = self.get_value(op.t_path)
         return False if cur else True
 
     # JSON Opperation - Add some constant value to the number at the given path
     def number_add(self, op):
-        return self.get_value(op.path) + op.val
+        return self.get_value(op.t_path) + op.val
 
     # JSON Opperation - Insert characters into a string at the given
     # path, and at the given offset within that string.
@@ -107,6 +110,30 @@ class Snapshot:
     def string_delete(self, op):
         cur = self.get_value(op.t_path)
         return cur[:op.t_offset] + cur[op.t_offset + op.t_val:]
+
+    def string_move(self, op):
+        """
+        A range of text is moved from one position in a document to another.
+        The text can move within a string element, or from one string element
+        to another.
+        """
+        cur = self.get_value(op.t_path)
+        txt = cur[op.t_offset:op.t_offset + op.t_val]  # text to be moved.
+        remaining_txt = cur[:op.t_offset] + cur[op.t_offset + op.t_val:]
+        # first delete text where it was
+        if op.t_path == []:
+            self.snapshot = remaining_txt
+        else:
+            node = self.get_node(op.t_path)
+            node[op.t_path[-1]] = remaining_txt
+        # then insert it at the destination
+        dest_v = self.get_value(op.t_dest_path)
+        new_txt = dest_v[:op.t_dest_offset] + txt + dest_v[op.t_dest_offset:]
+        if op.t_dest_path == []:
+            self.snapshot = new_txt
+        else:
+            node = self.get_node(op.t_dest_path)
+            node[op.t_dest_path[-1]] = new_txt
 
     def array_insert(self, op):
         cur = self.get_value(op.t_path)
