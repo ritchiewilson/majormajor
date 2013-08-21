@@ -55,6 +55,11 @@ class Document:
         self.time_of_last_received_cs = datetime.now()
 
     def get_id(self):
+        """
+        Get the document id.
+
+        :rtype: uuid
+        """
         return self.id_
 
     def get_user(self):
@@ -64,42 +69,101 @@ class Document:
         return self.root_changeset
 
     def get_ordered_changesets(self):
+        """
+        Get a copy of the list of active changesets in their correct order
+        for this document.
+
+        :returns: List of ordered, active changesets
+        """
         return self.ordered_changesets[:]
 
     def get_dependencies(self):
         """
-        Returns a list of the dependencies that make up the the current
-        document. Usually this is a list of with just the most recent
-        changeset. There can be multiple changesets if they each
-        depend on the same changeset but do not know about each other.
+        Returns a list of the dependencies that define the document's
+        current snapshot. Usually this is a list of with just the most recent
+        changeset. There are multiple dependencies when the current snapshot is
+        built from multiple branches which do not know about each other.
+
+        :rtype: list of Changesets
         """
         return self.dependencies[:]
 
     def get_missing_changeset_ids(self):
+        """
+        Returns a set of ids for Changesets this document knows of but does not
+        have data for. This is useful when MajorMajor requests Changesets from
+        remote users.
+
+        :return: set of Changeset ids
+        """
         return self.missing_changesets.copy()
 
     def get_send_queue(self):
+        """
+        Opperations created locally are first put in the send_queue and are not
+        necessarily sent immediately. MajorMajor pulls from this queue to
+        broadcast new changesets. Returns a copy of the list, not the list
+        itself.
+
+        :return: list of Changesets
+        """
         return self.send_queue[:]
 
     def clear_send_queue(self):
+        """
+        Clear the send queue. MajorMajor does this after it has pulled all the
+        changesets from the queue and broadcast them.
+        """
         self.send_queue = []
 
-    def get_missing_dependency_ids(self, new_cs):
+    def get_missing_dependency_ids(self, cs):
+        """
+        Check the given Changeset for parents this document does not yet know
+        of. If the document has data for all of the Changesets parents, then it
+        returns an empty list. Otherwise it return a list of Changeset ids.
+
+        :param cs: Changeset to examine
+        :return: list of Changeset ids
+        """
         missing_dep_ids = []
-        for dep in new_cs.get_parents():
+        for dep in cs.get_parents():
             if not isinstance(dep, Changeset):
                 missing_dep_ids.append(dep)
         return missing_dep_ids
 
     def get_changeset_by_id(self, cs_id):
+        """
+        Get the Changeset object by its id. If the document does not know the
+        changeset, return None.
+
+        :param cs_id: Id of the Changeset to get
+        :rtype: Changeset or None
+        """
         if cs_id in self.all_known_changesets:
             return self.all_known_changesets[cs_id]['obj']
         return None
 
     def get_open_changeset(self):
+        """
+        Returns the changeset which this document is still adding local
+        opperations to. When no opperations have been added yet, the open
+        changeset will be None.
+
+        :rtype: Changeset or None
+        """
         return self.open_changeset
 
     def get_time_of_last_received_cs(self):
+        """
+        Return the time this document last received a changeset from a remote
+        user.
+
+        Documents keep track of when they last received a changeset from a
+        remote user. This is so MajorMajor does not try to sync when messages
+        could reasonably still be in transit.
+
+        :rtype: datetime.datetime
+        """
         return self.time_of_last_received_cs
 
     def get_changesets_in_ranges(self, start_ids, end_ids):
@@ -118,24 +182,69 @@ class Document:
         return cs_in_range  # TODO needed?
 
     def get_snapshot(self):
+        """
+        Get the python representation of the document data.
+
+        The snapshot is one of:
+          * dict
+          * list
+          * unicode
+          * int
+          * float
+          * True
+          * False
+          * None
+
+        Keys in any dict are unicode. Values in dicts and elements in arrays
+        are themselves any valid snapshot.
+
+        .. note::
+           Document used to hold the snapshot itself. Now it holds a
+           Snapshot object which stores the data and applies the opperations to
+           the document structure. This method does not return the Snapshot
+           object, it returns the data from that Snapshot object.
+
+        """
         return self.snapshot.get_snapshot()
 
     def get_changesets(self):
         return self.changesets
 
-    def get_sync_status(self, remote_deps):
-        request_css = [dep for dep in remote_deps
+    def get_sync_status(self, remote_dep_ids):
+        """Get the Changesets which must be requested from and sent to a remote
+        user in order to begin syncing documents.
+
+        When a remote user sends a request to sync, they will send
+        the ids of the changesets which are their document's dependencies. From
+        those dependency ids, this method determines which changesets to send
+        or request. If both returned lists are empty, the documents are fully
+        synced.
+
+        :param remote_dep_ids: The remote user's dependency ids
+        :type remote_dep_ids: list of str
+        :returns: list of Changeset ids to request and list of Changesets to
+                  send to remote user
+
+        """
+        request_css = [dep for dep in remote_dep_ids
                        if not self.knows_changeset(dep)]
         send_css = [cs for cs in self.dependencies
-                    if not cs.get_id() in remote_deps]
+                    if not cs.get_id() in remote_dep_ids]
         return request_css, send_css
 
     def request_ancestors(self, cs_ids, dep_ids):
         """
-        A remote user has requested info on cs_ids and their ancestors. Based
-        on the remote users dep_ids and the number of changesets they know
-        about, put together a reasonable collection of changesets to send to
-        them.
+        Return a list of Changesets (given by cs_ids) and some number of their
+        ancestors.
+
+        A remote user has requested info the Changesets in cs_ids, and has also
+        requested information on their ancestors. Based on the remote users
+        given dep_ids, put together a reasonable collection of changesets to
+        send in bulk.
+
+        :param cs_ids: The changesets being directly requested
+        :param dep_ids: The remote user's document's dependencies
+        :return: list of Changesets
         """
         response_css = set(self.get_changeset_by_id(cs) for cs in cs_ids
                            if self.knows_changeset(cs))
@@ -162,13 +271,21 @@ class Document:
                     css.extend(cs.get_parents())
         return list(response_css)
 
-    def set_initial_snapshot(self, s):
+    def set_initial_snapshot(self, snapshot):
         """
-        Can stick in boilerplate snapshot for doc. turns snapshot into an
-        opperation.
-        TODO - throw exception if doc is not new
+        Sets the initial snapshot of a document by creating a 'set' opperation
+        with the given snapshot at the root of the document.
+
+        This will also reset the root changeset to contain just that 'set'
+        opperation, and will clear the ordered_changesets list so it contains
+        just that root changeset.
+
+        :param snapshot: initial snapshot for document
+        :type snapshot: valid snapshot
+
         """
-        op = Op('set', [], val=s)
+        # TODO - throw exception if doc is not new
+        op = Op('set', [], val=snapshot)
         self.add_local_op(op)
         cs = self.close_changeset()
         self.clear_send_queue()
@@ -178,11 +295,12 @@ class Document:
 
     def set_snapshot(self, snapshot, deps):
         """
-        Reset the snapshot of this documnet. Also needs to take the
-        dependency that defines this snapshot. Since the local user
-        will be working on from this point, this dependency takes over
-        and all previously known changesets are put in the pending
-        list until they can be sorted back in.
+        Set the data for the snapshot of this documnet. This also needs to set
+        the document's dependencies to the deps which define this snapshot.
+
+        The local user will now make changes off of this snapshot with these
+        dependencies.
+
         """
         self.snapshot.set_snapshot(snapshot)
         for dep in deps:
@@ -190,6 +308,15 @@ class Document:
         self.dependencies = deps
 
     def knows_changeset(self, cs_id):
+        """
+        Determine if the document has all data for the Changeset with the given
+        cs_id.
+
+        :param cs_id: Id of the Changeset to search for
+        :type cs_id: str
+        :return: If this document has all data for the Changeset
+        :rtype: bool
+        """
         if cs_id in self.all_known_changesets:
             return True
         return False
@@ -207,11 +334,14 @@ class Document:
 
     def add_local_op(self, op):
         """
-        For when this user (not remote collaborators) add an
-        opperation. If there is no open changeset, one will be opened
-        with correct dependencies and the given op. If a changeset is
-        already started, the given op is just added on. The given op
-        is then immediatly applied to this Document.
+        Adds and applies a new opperation from the local user to this document.
+
+        If there is no open changeset, one will be opened with correct
+        dependencies and the given op. If a changeset is already started, the
+        given op is just added on. The given op is then immediatly applied to
+        this Document.
+
+        :param op: the locally created Op to apply to this Document
         """
         if self.open_changeset is None:
             self.open_changeset = Changeset(self.id_, self.user,
@@ -221,12 +351,18 @@ class Document:
 
     def close_changeset(self):
         """
-        Close a changeset so it can be hashed and sent to
-        collaborators. Once a changeset is closed it must stay
-        unaltered so that sha1 hash is always calculable and
-        consistant.
+        Closes and returns this document's open changeset. Return False if
+        there was no open changeset or opperations.
 
-        Adds the changeset to this documents list of dependencies.
+        A closed changeset is considered final, so it will be added to the list
+        of ordered changesets and set as this documents sole dependency.
+
+        Once a changeset is closed it cannot be altered because its data is
+        used to calculate its id, and the id is essential for ordering
+        changesets. Adding an opperation to a changeset once it is closed will
+        throw an error.
+
+        :returns: The closed changeset or False
         """
 
         if self.open_changeset and self.open_changeset.is_empty():
