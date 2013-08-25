@@ -81,6 +81,7 @@ class MajorMajor:
         called on a timer. Instead, changesets are applied immediately when
         they are received.
         """
+        # TODO: Document should keep a flag if a pull attempt is even needed
         for doc in self.documents:
             old_state = copy.deepcopy(doc.get_snapshot())
             was_changed = doc.pull_from_pending_list()
