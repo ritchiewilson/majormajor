@@ -28,7 +28,6 @@ from .message import Message
 
 
 class MajorMajor:
-    # TODO: user authentication
 
     def __init__(self):
         """
@@ -47,8 +46,8 @@ class MajorMajor:
         # event loop so HAS_EVENT_LOOP needs to be manually set to False.
         self.HAS_EVENT_LOOP = True
         GObject.timeout_add(500, self.pull_from_pending_lists)
-        GObject.timeout_add(2000, self._retry_request_changesets)
-        GObject.timeout_add(5000, self._sync_documents)
+        GObject.timeout_add(2000, self.retry_request_changesets)
+        GObject.timeout_add(5000, self.sync_documents)
         self.big_insert = False
         self.drop_random_css = False
 
@@ -58,16 +57,30 @@ class MajorMajor:
         sending json by broadcasting UDP over the local network.
         """
         from .connections.UDP import UDPBroadcastConnection
-        c = UDPBroadcastConnection(callback=self._listen_callback,
+        c = UDPBroadcastConnection(callback=self.connection_callback,
                                    listen_port=port)
         self.connections.append(c)
 
     def open_mq_connection(self):
         from .connections.MQ import RabbitMQConnection
-        c = RabbitMQConnection(callback=self._listen_callback)
+        c = RabbitMQConnection(callback=self.connection_callback)
         self.connections.append(c)
 
     def pull_from_pending_lists(self):
+        """
+        Try to apply pending changesets in each document.
+
+        When changesets come in from remote users they are not applied
+        immediately, but are instead put into a 'pending' list for that
+        document. This method is called on a timer to pull out and apply
+        changesets which can be used in each document. This is done so that
+        opperational transformation can be done in batches, which recudes
+        costly computations.
+
+        When the MajorMajor flag HAS_EVENT_LOOP is set to False, this is not
+        called on a timer. Instead, changesets are applied immediately when
+        they are received.
+        """
         for doc in self.documents:
             old_state = copy.deepcopy(doc.get_snapshot())
             was_changed = doc.pull_from_pending_list()
@@ -101,6 +114,9 @@ class MajorMajor:
         """
         A MajorMajor can hold multiple documents. Get the relevent
         document by doc_id.
+
+        :param doc_id: Id of desired document
+        :type doc_id: uuid
         """
         if isinstance(doc_id, str) or isinstance(doc_id, unicode):
             doc_id = uuid.UUID(doc_id)
@@ -109,12 +125,16 @@ class MajorMajor:
                 return doc
         return None
 
-    def _listen_callback(self, msg):
-        """
-        Whenever a socket is written to, this callback handles the
-        message. If it is a bounceback from this user, just drop the
-        message. Otherwise check the 'action' to figure out what to
-        do.
+    def connection_callback(self, msg):
+        """Handles all Messages that comes in from remote users.
+
+        This method is passed to all Connections, and it becomes the callback
+        for when the Connection collects a complete message. Here, MajorMajor
+        parses the mesage to determine which action to take and passes the data
+        on to the relevant document.
+
+        :param msg: Message from remote user
+        :type msg: Message
         """
         return_msg = {}
         action = msg.get_action()
@@ -135,11 +155,20 @@ class MajorMajor:
         if action == 'request_changesets':
             return_msg = self.respond_to_changeset_request(msg)
         if action == 'sync':
-            return_msg = self._sync_document(msg)
+            return_msg = self.sync_document(msg)
 
         return return_msg
 
-    def _retry_request_changesets(self):
+    def retry_request_changesets(self):
+        """
+        Resend requests for missing changesets in all documents.
+
+        All these changesets have been previously requested, but this
+        MajorMajor instance has not gotten a response. When there is an event
+        loop running, this gets called on a timer. The waiting time between
+        requests for any changeset doubles each time, so the requests gradually
+        back off.
+        """
         msg = {}
         for doc_id, css in self.requested_changesets.items():
             doc = self.get_document_by_id(doc_id)
@@ -161,8 +190,10 @@ class MajorMajor:
             return True
         return msg
 
-    def _sync_documents(self):
+    def sync_documents(self):
         """
+        Broadcasts a sync request for each open document.
+
         This is periodically called on a timer to check that documents are
         synced. If the Document has just recently received a new
         changeset, don't try to sync since it is probably already in
@@ -172,12 +203,12 @@ class MajorMajor:
         for doc in self.documents:
             time_diff = datetime.now() - doc.get_time_of_last_received_cs()
             if time_diff.seconds < 5: continue
-            self._sync_document(doc=doc)
+            self.sync_document(doc=doc)
         if self.HAS_EVENT_LOOP:
             return True
         return msg
 
-    def _sync_document(self, remote_msg=None, doc=None, user=None):
+    def sync_document(self, remote_msg=None, doc=None, user=None):
         if self.drop_random_css:
             return
         if doc is None:
