@@ -396,7 +396,21 @@ class MajorMajor:
 
     def announce(self, users=[], broadcast=True):
         """
-        Builds message for announcing avalibility
+        Sends a message to remote users announcing this MajorMajor's existance
+        to peers. Also, it sends a list of local connection types and details
+        so that peers can message this MajorMajor directly.
+
+        If a list of users is specified, this will send the announcement to
+        just those users. Otherwise it will send the announcement to all known
+        users.
+
+        By default, this will use the various connection's types 'broadcast'
+        method of messaging.
+
+        :param users: The users to message directly (or all users if not set)
+        :type users: list of Users
+        :param broadcast: Whether to flag Connection's broadcast method
+        :type broadcast: bool
         """
         conns = [conn.get_listen_info() for conn in self.connections]
         msg = Message('announce', self.default_user, conns=conns)
