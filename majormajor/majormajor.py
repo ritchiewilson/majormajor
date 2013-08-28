@@ -210,6 +210,27 @@ class MajorMajor:
         return msg
 
     def sync_document(self, remote_msg=None, doc=None, user=None):
+        """
+        Create and send a 'sync' message with relevant information to further
+        the syncing process.
+
+        This method is called in one of two ways. First, MajorMajor will call
+        this on a timer to initialize the syncing process with a
+        collaborator. In that case, this takes in the relevant Document and
+        User and only sends the current state (dependency ids) of the document.
+
+        This method is also called when MajorMajor collects a 'sync'
+        message. If this document has the same dependency ids, it will send
+        back a message saying that is is synced. Otherwise it will send
+        changesets which the remote user needs and request missing changesets
+        the remote user has. This exchange of changesets goes back and forth
+        until the two documents are synced, and a message is sent indicating
+        that 'synced=True'.
+
+        :param remote_msg: Sync Message from remote user, if any
+        :param doc: The Document to sync (only when initializing process)
+        :param user: The User to sync with (only when initializing process)
+        """
         if self.drop_random_css:
             return
         if doc is None:
