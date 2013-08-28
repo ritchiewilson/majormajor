@@ -278,6 +278,19 @@ class MajorMajor:
         return msg
 
     def receive_announce(self, remote_msg):
+        """
+        Handle incoming messages of remote users announcing themseves to peers.
+
+        If the user was already known, just update their connection
+        information.
+
+        If the user was not known, add them to the list of known users and save
+        the connection information. Then send an announce message directly to
+        them, telling the remote user how this MajorMajor can be directly
+        messaged.
+
+        :param remote_msg: Announce Message from the remote user
+        """
         if remote_msg.from_user == self.default_user: return {}
         user = self.get_user_by_id(remote_msg.from_user)
         if user:
@@ -372,7 +385,7 @@ class MajorMajor:
         for callback in self.signal_callbacks['accept-invitation']:
             callback(doc)
         return msg
-        
+
     def request_snapshot(self, doc, user):
         """
         Request a document snapshot from a user.
