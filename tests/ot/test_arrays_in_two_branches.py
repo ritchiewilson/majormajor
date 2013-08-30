@@ -100,7 +100,6 @@ class TestArraysInTwoBranches:
                   'UVWX',
                   'YZ']
         assert doc.get_snapshot() == result
-        assert opB1.t_offset == 2
         assert opB1.t_val == 0
         assert opB1.is_noop()
 
@@ -127,10 +126,10 @@ class TestArraysInTwoBranches:
         B3.set_id('B3')
         doc.receive_changeset(B3)
         result = ['ABCD',
-                  'BBBBB',
-                  'CCCCC',
                   '0123',
                   '4567',
+                  'BBBBB',
+                  'CCCCC',
                   'UVWX',
                   'YZ']
         assert doc.get_snapshot() == result
@@ -143,10 +142,10 @@ class TestArraysInTwoBranches:
         B4.set_id('B4')
         doc.receive_changeset(B4)
         result = ['ABCD',
-                  'BBBBB',
-                  'CCCCC',
                   '0123',
                   '4567',
+                  'BBBBB',
+                  'CCCCC',
                   'DDDDD',
                   'EEEEE',
                   'UVWX',
@@ -225,7 +224,6 @@ class TestArraysInTwoBranches:
                   'YZ']
         assert doc.get_snapshot() == result
 
-        # Insert before the Delete Range
         B3 = Changeset(doc.get_id(), 'u2', [B2])
         vB3 = ['BBBBB', 'CCCCC']
         opB3 = Op('ai', [], offset=1, val=vB3)
@@ -241,7 +239,6 @@ class TestArraysInTwoBranches:
                   'YZ']
         assert doc.get_snapshot() == result
 
-        # Insert After the Delete Range
         B4 = Changeset(doc.get_id(), 'u2', [B3])
         vB4 = ['DDDDD', 'EEEEE']
         opB4 = Op('ai', [], offset=3, val=vB4)
@@ -255,6 +252,224 @@ class TestArraysInTwoBranches:
                   'EEEEE',
                   '0123',
                   '4567',
+                  'UVWX',
+                  'YZ']
+        assert doc.get_snapshot() == result
+
+    def test_consecutive_inserts(self):
+        doc = self.doc1
+        root = self.root1
+
+        # Branch A
+        A0 = Changeset(doc.get_id(), 'u1', [root])
+        vA0 = ['1', '2']
+        A0.add_op(Op('ai', [], offset=2, val=vA0))
+        A0.set_id('A')
+        doc.receive_changeset(A0)
+
+        A1 = Changeset(doc.get_id(), 'u1', [A0])
+        vA1 = ['3', '4']
+        A1.add_op(Op('ai', [], offset=4, val=vA1))
+        doc.receive_changeset(A1)
+
+        A2 = Changeset(doc.get_id(), 'u1', [A1])
+        vA2 = ['8', '9']
+        A2.add_op(Op('ai', [], offset=9, val=vA2))
+        doc.receive_changeset(A2)
+
+        A3 = Changeset(doc.get_id(), 'u1', [A2])
+        vA3 = ['0']
+        A3.add_op(Op('ai', [], offset=11, val=vA3))
+        doc.receive_changeset(A3)
+        result = ['ABCD',
+                  'EFGH',
+                  '1', '2', '3', '4',
+                  'IJKL',
+                  'MNOP',
+                  'QRST',
+                  '8', '9', '0',
+                  'UVWX',
+                  'YZ']
+        assert doc.get_snapshot() == result
+
+        # Now B has a series of inserts
+        B0 = Changeset(doc.get_id(), 'u1', [root])
+        vB0 = ['1b', '2b']
+        B0.add_op(Op('ai', [], offset=1, val=vB0))
+        B0.set_id('B')
+        doc.receive_changeset(B0)
+        result = ['ABCD',
+                  '1b', '2b',
+                  'EFGH',
+                  '1', '2', '3', '4',
+                  'IJKL',
+                  'MNOP',
+                  'QRST',
+                  '8', '9', '0',
+                  'UVWX',
+                  'YZ']
+        assert doc.get_snapshot() == result
+
+        B1 = Changeset(doc.get_id(), 'u1', [B0])
+        vB1 = ['3b', '4b']
+        B1.add_op(Op('ai', [], offset=5, val=vB1))
+        doc.receive_changeset(B1)
+        result = ['ABCD',
+                  '1b', '2b',
+                  'EFGH',
+                  '1', '2', '3', '4',
+                  'IJKL',
+                  '3b', '4b',
+                  'MNOP',
+                  'QRST',
+                  '8', '9', '0',
+                  'UVWX',
+                  'YZ']
+        assert doc.get_snapshot() == result
+
+        B2 = Changeset(doc.get_id(), 'u1', [B1])
+        vB2 = ['8b', '9b', '0b']
+        B2.add_op(Op('ai', [], offset=7, val=vB2))
+        doc.receive_changeset(B2)
+        result = ['ABCD',
+                  '1b', '2b',
+                  'EFGH',
+                  '1', '2', '3', '4',
+                  'IJKL',
+                  '3b', '4b', '8b', '9b', '0b',
+                  'MNOP',
+                  'QRST',
+                  '8', '9', '0',
+                  'UVWX',
+                  'YZ']
+        assert doc.get_snapshot() == result
+
+        B3 = Changeset(doc.get_id(), 'u1', [B2])
+        vB3 = ['BBBB']
+        B3.add_op(Op('ai', [], offset=12, val=vB3))
+        doc.receive_changeset(B3)
+        result = ['ABCD',
+                  '1b', '2b',
+                  'EFGH',
+                  '1', '2', '3', '4',
+                  'IJKL',
+                  '3b', '4b', '8b', '9b', '0b',
+                  'MNOP',
+                  'QRST',
+                  '8', '9', '0',
+                  'BBBB',
+                  'UVWX',
+                  'YZ']
+        assert doc.get_snapshot() == result
+
+    def test_consecutive_inserts_reversed(self):
+        """
+        Same as the previous test except branch B gets applied before branch A.
+        """
+        doc = self.doc1
+        root = self.root1
+
+        # Branch A
+        A0 = Changeset(doc.get_id(), 'u1', [root])
+        vA0 = ['1', '2']
+        A0.add_op(Op('ai', [], offset=2, val=vA0))
+        A0.set_id('1A')
+        doc.receive_changeset(A0)
+
+        A1 = Changeset(doc.get_id(), 'u1', [A0])
+        vA1 = ['3', '4']
+        A1.add_op(Op('ai', [], offset=4, val=vA1))
+        doc.receive_changeset(A1)
+
+        A2 = Changeset(doc.get_id(), 'u1', [A1])
+        vA2 = ['8', '9']
+        A2.add_op(Op('ai', [], offset=9, val=vA2))
+        doc.receive_changeset(A2)
+
+        A3 = Changeset(doc.get_id(), 'u1', [A2])
+        vA3 = ['0']
+        A3.add_op(Op('ai', [], offset=11, val=vA3))
+        doc.receive_changeset(A3)
+        result = ['ABCD',
+                  'EFGH',
+                  '1', '2', '3', '4',
+                  'IJKL',
+                  'MNOP',
+                  'QRST',
+                  '8', '9', '0',
+                  'UVWX',
+                  'YZ']
+        assert doc.get_snapshot() == result
+
+        # Now B has a series of inserts
+        B0 = Changeset(doc.get_id(), 'u1', [root])
+        vB0 = ['1b', '2b']
+        B0.add_op(Op('ai', [], offset=1, val=vB0))
+        B0.set_id('0B')
+        doc.receive_changeset(B0)
+        a_index = doc.get_ordered_changesets().index(A0)
+        b_index = doc.get_ordered_changesets().index(B0)
+        assert a_index > b_index
+        result = ['ABCD',
+                  '1b', '2b',
+                  'EFGH',
+                  '1', '2', '3', '4',
+                  'IJKL',
+                  'MNOP',
+                  'QRST',
+                  '8', '9', '0',
+                  'UVWX',
+                  'YZ']
+        assert doc.get_snapshot() == result
+
+        B1 = Changeset(doc.get_id(), 'u1', [B0])
+        vB1 = ['3b', '4b']
+        B1.add_op(Op('ai', [], offset=5, val=vB1))
+        doc.receive_changeset(B1)
+        result = ['ABCD',
+                  '1b', '2b',
+                  'EFGH',
+                  '1', '2', '3', '4',
+                  'IJKL',
+                  '3b', '4b',
+                  'MNOP',
+                  'QRST',
+                  '8', '9', '0',
+                  'UVWX',
+                  'YZ']
+        assert doc.get_snapshot() == result
+
+        B2 = Changeset(doc.get_id(), 'u1', [B1])
+        vB2 = ['8b', '9b', '0b']
+        B2.add_op(Op('ai', [], offset=7, val=vB2))
+        doc.receive_changeset(B2)
+        result = ['ABCD',
+                  '1b', '2b',
+                  'EFGH',
+                  '1', '2', '3', '4',
+                  'IJKL',
+                  '3b', '4b', '8b', '9b', '0b',
+                  'MNOP',
+                  'QRST',
+                  '8', '9', '0',
+                  'UVWX',
+                  'YZ']
+        assert doc.get_snapshot() == result
+
+        B3 = Changeset(doc.get_id(), 'u1', [B2])
+        vB3 = ['BBBB']
+        B3.add_op(Op('ai', [], offset=12, val=vB3))
+        doc.receive_changeset(B3)
+        result = ['ABCD',
+                  '1b', '2b',
+                  'EFGH',
+                  '1', '2', '3', '4',
+                  'IJKL',
+                  '3b', '4b', '8b', '9b', '0b',
+                  'MNOP',
+                  'QRST',
+                  'BBBB',
+                  '8', '9', '0',
                   'UVWX',
                   'YZ']
         assert doc.get_snapshot() == result
