@@ -302,6 +302,19 @@ class Op(object):
 
         return hazard
 
+    def shift_from_consecutive_inserts(self, op, past_t_offset, past_t_val):
+        """
+        With string inserts working on the same string or array inserts working
+        on the same array, the OT and resulting hazards are the same. This is
+        called in those cases to handle the ot and return the needed Hazard.
+        """
+        hazard = False
+        if self.t_offset >= past_t_offset:
+            self.t_offset += len(past_t_val)
+        else:
+            hazard = Hazard(op, self, offset_shift=len(self.t_val))
+        return hazard
+
     def object_transformation(self, past_t_path, past_t_offset, past_t_val):
         """
         For any object transformations, the results are the same. Either 1)

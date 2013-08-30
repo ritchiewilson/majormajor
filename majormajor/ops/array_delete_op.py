@@ -28,8 +28,13 @@ class ArrayDeleteOp(Op):
         Calculate how this op should be handled by a future op, accounting
         for any hazards that need to be applied.
         """
-        #hazards = self.get_relevant_hazards(cs)
-        return self.t_path, self.t_offset, self.t_val
+        hazards = self.get_relevant_hazards(cs)
+        past_t_val = self.t_val
+        past_t_offset = self.t_offset
+        for hazard in hazards:
+            past_t_val += hazard.get_val_shift()
+            past_t_offset += hazard.get_offset_shift()
+        return self.t_path, past_t_offset, past_t_val
 
     def array_insert_transform(self, op):
         """
@@ -42,6 +47,7 @@ class ArrayDeleteOp(Op):
         past_t_path, past_t_offset, past_t_val = \
             op.get_properties_shifted_by_hazards(self.get_changeset())
 
+        hazard = False
         # if this path is smaller than the old one, there's no conflict
         if len(self.t_path) < len(past_t_path):
             pass
@@ -52,12 +58,14 @@ class ArrayDeleteOp(Op):
             elif past_t_offset < self.t_offset + self.t_val:
                 # expand deletion to include past insertion
                 self.t_val += len(past_t_val)
-                # otherwise the path may need to shift
+            else:
+                shift = self.t_val * -1
+                hazard = Hazard(op, self, offset_shift=shift)
         elif past_t_path == self.t_path[:len(past_t_path)]:
             # path may need to shift at one point
             if past_t_offset <= self.t_path[len(past_t_path)]:
                 self.t_path[len(past_t_path)] += len(past_t_val)
-        return False
+        return hazard
 
     def array_delete_transform(self, op):
         """

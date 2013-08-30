@@ -43,12 +43,8 @@ class StringInsertOp(Op):
         past_t_path, past_t_offset, past_t_val \
             = op.get_properties_shifted_by_hazards(self.get_changeset())
 
-        hazard = False
-
-        if self.t_offset >= past_t_offset:
-            self.t_offset += len(op.t_val)
-        else:
-            hazard = Hazard(op, self, offset_shift=len(self.t_val))
+        hazard = self.shift_from_consecutive_inserts(op, past_t_offset,
+                                                     past_t_val)
 
         return hazard
 

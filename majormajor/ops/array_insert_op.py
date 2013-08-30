@@ -37,6 +37,7 @@ class ArrayInsertOp(Op):
         result could be nothing, or some peice of the path must be shifted, or
         the offset must be shifted.
         """
+        hazard = False
         past_t_path, past_t_offset, past_t_val = \
             op.get_properties_shifted_by_hazards(self.get_changeset())
 
@@ -46,13 +47,13 @@ class ArrayInsertOp(Op):
 
         # when the paths are exactly equal, this offset may need to shift up
         elif past_t_path == self.t_path:
-            if past_t_offset <= self.t_offset:
-                self.t_offset += len(past_t_val)
+            hazard = self.shift_from_consecutive_inserts(op, past_t_offset,
+                                                         past_t_val)
         # otherwise the path may need to shift
         elif past_t_path == self.t_path[:len(past_t_path)]:
             if past_t_offset <= self.t_path[len(past_t_path)]:
                 self.t_path[len(past_t_path)] += len(past_t_val)
-        return False
+        return hazard
 
     def array_delete_transform(self, op):
         """
