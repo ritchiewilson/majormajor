@@ -29,7 +29,7 @@ from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
 
-class TestChangesetOT:
+class TestStringsInTwoBranches:
 
     def test_one_delete_in_first_branch(self):
         """
