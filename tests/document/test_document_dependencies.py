@@ -16,10 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from majormajor.document import Document
-from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 import random
-import string
+
 
 class TestDocumentDependencyTreeToList:
 
@@ -258,7 +257,12 @@ class TestDocumentDependencyTreeToList:
         all to the doc, and make sure the resulting order is the same
         as when done with tree_to_list().
         """
-        NUMBER_OF_CHANGESETS = 500
+        # NOTE: Testing large numbers of changesets is slow, so dropping
+        # the number for normal testing.
+        
+        # NUMBER_OF_CHANGESETS = 5000
+        NUMBER_OF_CHANGESETS = 200
+
         doc = Document(snapshot='')
         doc.HAS_EVENT_LOOP = False
         assert doc.get_ordered_changesets() == doc.tree_to_list()
