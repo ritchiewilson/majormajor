@@ -363,7 +363,6 @@ class Op(object):
         :type past_t_val: int
         :returns: Hazard caused by this OT or False if not needed
         :rtype: Hazard or False
-
         """
         hazard = False
 
@@ -378,6 +377,50 @@ class Op(object):
             hazard = Hazard(op, self, val_shift=vs)
         else:
             hazard = Hazard(op, self, offset_shift=len(self.t_val))
+
+        return hazard
+
+    def transform_delete_by_previous_insert(self, op, past_t_offset,
+                                            past_t_val):
+        """Transform a string_delete by a string_insert when they apply to the
+        same string, or transform an array_delete by an array_insert when they
+        apply to the same array.
+
+        When this deletion happens at an index above the previous op's offset,
+        this op's offset needs to shift forward by the size of the insert.. If
+        the past insertion is in this deletion range, this expands to encompass
+        the inserted text as well. Finally, if this deletion range is lower
+        than the index of the past insertion, this Op does not need to change,
+        but it will return a Hazard.
+
+        The boundaries of the deletion range are excluded from the deletion
+        range. This allows inserts at the edge cases to be preserved, and data
+        is not unnecessarily deleted.
+
+        :param op: Previous Op this is being transformed by
+        :param past_t_offset: The offset of op with all hazards applied
+        :type past_t_offset: int
+        :param past_t_val: The val of op with all hazards applied
+        :type past_t_val: str or list
+        :returns: Hazard caused by this OT or False if not needed
+        :rtype: Hazard or False
+        """
+        hazard = False
+
+        # if insertion was in this deletion range, expand the range to delete
+        # that text as well.
+        if self.t_offset + self.t_val > past_t_offset \
+                and self.t_offset < past_t_offset:
+            self.t_val += len(past_t_val)
+        # if the insertion comes before deletion range, shift deletion range
+        # forward
+        elif self.t_offset >= past_t_offset:
+            self.t_offset += len(past_t_val)
+        # Otherwise the past insertion has a higher index, so should be shifted
+        # to come in line with current document.
+        else:
+            shift = self.t_val * -1
+            hazard = Hazard(op, self, offset_shift=shift)
 
         return hazard
 

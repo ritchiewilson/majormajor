@@ -52,15 +52,9 @@ class ArrayDeleteOp(Op):
         if len(self.t_path) < len(past_t_path):
             pass
         elif past_t_path == self.t_path:
-            if past_t_offset <= self.t_offset:
-                #shift out of the way of a previous insertion
-                self.t_offset += len(past_t_val)
-            elif past_t_offset < self.t_offset + self.t_val:
-                # expand deletion to include past insertion
-                self.t_val += len(past_t_val)
-            else:
-                shift = self.t_val * -1
-                hazard = Hazard(op, self, offset_shift=shift)
+            hazard = self.transform_delete_by_previous_insert(op,
+                                                              past_t_offset,
+                                                              past_t_val)
         elif past_t_path == self.t_path[:len(past_t_path)]:
             # path may need to shift at one point
             if past_t_offset <= self.t_path[len(past_t_path)]:

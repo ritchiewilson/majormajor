@@ -46,22 +46,8 @@ class StringDeleteOp(Op):
         past_t_path, past_t_offset, past_t_val \
             = op.get_properties_shifted_by_hazards(self.get_changeset())
 
-        hazard = False
-
-        # if text was inserted into the deletion range, expand the
-        # range to delete that text as well.
-        if self.t_offset + self.t_val > past_t_offset \
-                and self.t_offset < past_t_offset:
-            self.t_val += len(op.t_val)
-        # if the insertion comes before deletion range, shift
-        # deletion range forward
-        elif self.t_offset >= past_t_offset:
-            self.t_offset += len(op.t_val)
-        # Otherwise the past insertion has a higher index, so should be shifted
-        # to come in line with current document.
-        else:
-            shift = self.t_val * -1
-            hazard = Hazard(op, self, offset_shift=shift)
+        hazard = self.transform_delete_by_previous_insert(op, past_t_offset,
+                                                          past_t_val)
 
         return hazard
 
