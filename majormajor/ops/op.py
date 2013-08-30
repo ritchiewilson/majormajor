@@ -315,6 +315,26 @@ class Op(object):
             hazard = Hazard(op, self, offset_shift=len(self.t_val))
         return hazard
 
+    def shift_insert_by_previous_delete(self, op, past_t_offset, past_t_val):
+        """
+        
+        """
+        hazard = False
+
+        if self.t_offset >= past_t_offset + past_t_val:
+            self.t_offset -= past_t_val
+        elif self.t_offset > past_t_offset:
+            self.t_offset = past_t_offset
+            vs = len(self.t_val)
+            # If string insert, blank val is '', for array it is []
+            self.t_val = '' if self.is_string_insert() else []
+            self.noop = True
+            hazard = Hazard(op, self, val_shift=vs)
+        else:
+            hazard = Hazard(op, self, offset_shift=len(self.t_val))
+
+        return hazard
+
     def object_transformation(self, past_t_path, past_t_offset, past_t_val):
         """
         For any object transformations, the results are the same. Either 1)

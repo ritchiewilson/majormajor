@@ -64,6 +64,7 @@ class ArrayInsertOp(Op):
         it is past the delete range. Lastly, it could just mean the path needs
         to shift at one point.
         """
+        hazard = False
         past_t_path, past_t_offset, past_t_val = \
             op.get_properties_shifted_by_hazards(self.get_changeset())
 
@@ -82,16 +83,6 @@ class ArrayInsertOp(Op):
                 self.t_path[len(past_t_path)] -= past_t_val
         # lastly, if they have the same path, offsets may need to shift
         elif past_t_path == self.t_path:
-            # this op could have been in delete range (avoid deleting if at all
-            # possible)
-            start = past_t_offset + 1
-            stop = past_t_offset + past_t_val
-            delete_range = xrange(start, stop)
-            if self.t_offset in delete_range:
-                self.t_offset = past_t_offset
-                self.t_val = []
-                self.noop = True
-            elif self.t_offset > past_t_offset:
-                self.t_offset -= past_t_val
-
-        return False
+            hazard = self.shift_insert_by_previous_delete(op, past_t_offset,
+                                                          past_t_val)
+        return hazard
