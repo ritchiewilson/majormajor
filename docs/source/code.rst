@@ -1,12 +1,28 @@
 Documentation for Code
 ======================
 
-.. automodule:: majormajor
+.. module:: majormajor
 
 MajorMajor
 ----------
 
-.. automodule:: majormajor.majormajor
-
 .. autoclass:: MajorMajor
+   :members:
+
+Document
+--------
+
+.. autoclass:: Document
+   :members:
+
+Changeset
+---------
+
+.. autoclass:: Changeset
+   :members:
+
+Op
+--
+
+.. autoclass:: Op
    :members:
