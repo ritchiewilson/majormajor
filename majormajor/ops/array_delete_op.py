@@ -99,7 +99,7 @@ class ArrayDeleteOp(Op):
         elif self.t_path == past_t_path:
             # if the paths are identical, only delete ranges need to be
             # considered, just like overlapping string deletes.
-            hazard = self.shift_from_overlaping_delete_ranges(op,
+            hazard = self.transform_delete_by_previous_delete(op,
                                                               past_t_offset,
                                                               past_t_val)
         return hazard

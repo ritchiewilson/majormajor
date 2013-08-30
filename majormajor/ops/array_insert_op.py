@@ -47,8 +47,9 @@ class ArrayInsertOp(Op):
 
         # when the paths are exactly equal, this offset may need to shift up
         elif past_t_path == self.t_path:
-            hazard = self.shift_from_consecutive_inserts(op, past_t_offset,
-                                                         past_t_val)
+            hazard = self.transform_insert_by_previous_insert(op,
+                                                              past_t_offset,
+                                                              past_t_val)
         # otherwise the path may need to shift
         elif past_t_path == self.t_path[:len(past_t_path)]:
             if past_t_offset <= self.t_path[len(past_t_path)]:
@@ -83,6 +84,7 @@ class ArrayInsertOp(Op):
                 self.t_path[len(past_t_path)] -= past_t_val
         # lastly, if they have the same path, offsets may need to shift
         elif past_t_path == self.t_path:
-            hazard = self.shift_insert_by_previous_delete(op, past_t_offset,
-                                                          past_t_val)
+            hazard = self.transform_insert_by_previous_delete(op,
+                                                              past_t_offset,
+                                                              past_t_val)
         return hazard

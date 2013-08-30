@@ -43,8 +43,8 @@ class StringInsertOp(Op):
         past_t_path, past_t_offset, past_t_val \
             = op.get_properties_shifted_by_hazards(self.get_changeset())
 
-        hazard = self.shift_from_consecutive_inserts(op, past_t_offset,
-                                                     past_t_val)
+        hazard = self.transform_insert_by_previous_insert(op, past_t_offset,
+                                                          past_t_val)
 
         return hazard
 
@@ -59,7 +59,7 @@ class StringInsertOp(Op):
         past_t_path, past_t_offset, past_t_val = \
             op.get_properties_shifted_by_hazards(self.get_changeset())
 
-        hazard = self.shift_insert_by_previous_delete(op, past_t_offset,
-                                                      past_t_val)
+        hazard = self.transform_insert_by_previous_delete(op, past_t_offset,
+                                                          past_t_val)
 
         return hazard

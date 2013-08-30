@@ -76,7 +76,7 @@ class StringDeleteOp(Op):
         past_t_path, past_t_offset, past_t_val \
             = op.get_properties_shifted_by_hazards(self.get_changeset())
 
-        hazard = self.shift_from_overlaping_delete_ranges(op, past_t_offset,
+        hazard = self.transform_delete_by_previous_delete(op, past_t_offset,
                                                           past_t_val)
 
         return hazard

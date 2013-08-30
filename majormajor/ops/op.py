@@ -237,15 +237,24 @@ class Op(object):
         r = self.object_transformation(past_t_path, past_t_offset, past_t_val)
         return r
 
-    def shift_from_overlaping_delete_ranges(self, op,
+    def transform_delete_by_previous_delete(self, op,
                                             past_t_offset, past_t_val):
         """
-        The transformations are the same for when combining two array_deletes
-        with the same path or two string deletes in the same string. Depending
-        on if and how the delete ranges overlap, this will shift the offset and
-        val, plus create the apropriate hazards.
-        """
+        Transform a string_delete by a string_delete when they apply to the
+        same string, or transform an array_delete by an array_delete when they
+        apply to the same array.
 
+        Depending on if and how the delete ranges overlap, this will shift the
+        offset and val, then create and return any apropriate hazard.
+
+        :param op: Previous Op this is being transformed by
+        :param past_t_offset: The offset of op with all hazards applied
+        :type past_t_offset: int
+        :param past_t_val: The val of op with all hazards applied
+        :type past_t_val: int
+        :returns: Hazard caused by this OT or False if not needed
+        :rtype: Hazard or False
+        """
         hazard = False
 
         srs = self.t_offset  # self range start
@@ -302,11 +311,24 @@ class Op(object):
 
         return hazard
 
-    def shift_from_consecutive_inserts(self, op, past_t_offset, past_t_val):
+    def transform_insert_by_previous_insert(self, op, past_t_offset,
+                                            past_t_val):
         """
-        With string inserts working on the same string or array inserts working
-        on the same array, the OT and resulting hazards are the same. This is
-        called in those cases to handle the ot and return the needed Hazard.
+        Transform a string_insert by a string_insert when they apply to the
+        same string, or transform an array_insert by an array_insert when they
+        apply to the same array.
+
+        When the previous op's offset is at a lower index, this op needs to be
+        shifted forward in the string or array. Otherwise it does not need to
+        change, but needs to return a hazard instead.
+
+        :param op: Previous Op this is being transformed by
+        :param past_t_offset: The offset of op with all hazards applied
+        :type past_t_offset: int
+        :param past_t_val: The val of op with all hazards applied
+        :type past_t_val: str or list
+        :returns: Hazard caused by this OT or False if not needed
+        :rtype: Hazard or False
         """
         hazard = False
         if self.t_offset >= past_t_offset:
@@ -315,9 +337,33 @@ class Op(object):
             hazard = Hazard(op, self, offset_shift=len(self.t_val))
         return hazard
 
-    def shift_insert_by_previous_delete(self, op, past_t_offset, past_t_val):
+    def transform_insert_by_previous_delete(self, op, past_t_offset,
+                                            past_t_val):
         """
-        
+        Transform a string_insert by a string_delete when they apply to the
+        same string, or transform an array_insert by an array_delete when they
+        apply to the same array.
+
+        When this insertion happens at an index above the previous op's
+        deletion range, this op's offset needs to shift back by that amount. If
+        it is in the deletion range, this becomes a noop, and the value is
+        reduced to nothing ('' for strings, [] for arrays). This will also
+        return a Hazards. Finally, if this insertion's happens at an index
+        below the deletion range, this Op does not need to change, but it will
+        return a Hazard.
+
+        The boundaries of the deletion range are excluded from the deletion
+        range. This allows inserts at the edge cases to be preserved, and data
+        is not unnecessarily deleted.
+
+        :param op: Previous Op this is being transformed by
+        :param past_t_offset: The offset of op with all hazards applied
+        :type past_t_offset: int
+        :param past_t_val: The val of op with all hazards applied
+        :type past_t_val: int
+        :returns: Hazard caused by this OT or False if not needed
+        :rtype: Hazard or False
+
         """
         hazard = False
 
