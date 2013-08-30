@@ -324,7 +324,7 @@ class Changeset:
         """
         Creates an id by building a specific json representation of
         this changeset, then getting the sha1 hash. If this has
-        already been done, the id_ is cached so just return it.
+        already been done, the _id is cached so just return it.
         """
         if self.id_ == None:
             h = hashlib.sha1()

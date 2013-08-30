@@ -20,3 +20,4 @@ from .majormajor import MajorMajor
 from .document import Document
 from .changeset import Changeset
 from .ops.op import Op
+from .message import Message

@@ -22,7 +22,15 @@ Changeset
    :members:
 
 Op
---
+---
 
 .. autoclass:: Op
    :members:
+
+
+Message
+-------
+
+.. autoclass:: Message
+   :members:
+

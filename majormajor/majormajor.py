@@ -227,7 +227,7 @@ class MajorMajor:
         until the two documents are synced, and a message is sent indicating
         that 'synced=True'.
 
-        :param remote_msg: Sync Message from remote user, if any
+        :param remote_msg: Sync :class:`Message` from remote user, if any
         :param doc: The Document to sync (only when initializing process)
         :param user: The User to sync with (only when initializing process)
         """
