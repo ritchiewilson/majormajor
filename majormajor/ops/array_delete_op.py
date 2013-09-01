@@ -23,12 +23,12 @@ class ArrayDeleteOp(Op):
     def is_array_delete(self):
         return True
 
-    def get_properties_shifted_by_hazards(self, cs):
+    def get_properties_shifted_by_hazards(self, op):
         """
         Calculate how this op should be handled by a future op, accounting
         for any hazards that need to be applied.
         """
-        hazards = self.get_relevant_hazards(cs)
+        hazards = self.get_relevant_hazards(op)
         past_t_val = self.t_val
         past_t_offset = self.t_offset
         for hazard in hazards:
@@ -45,7 +45,7 @@ class ArrayDeleteOp(Op):
         cross, this delete's path may need to be shifted at one point.
         """
         past_t_path, past_t_offset, past_t_val = \
-            op.get_properties_shifted_by_hazards(self.get_changeset())
+            op.get_properties_shifted_by_hazards(self)
 
         hazard = False
         # if this path is smaller than the old one, there's no conflict
@@ -71,7 +71,7 @@ class ArrayDeleteOp(Op):
         overlapping delete ranges (just like string deletes).
         """
         past_t_path, past_t_offset, past_t_val = \
-            op.get_properties_shifted_by_hazards(self.get_changeset())
+            op.get_properties_shifted_by_hazards(self)
 
         hazard = False
         # if this path is smaller than the old one, there's no conflict

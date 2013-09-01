@@ -23,16 +23,35 @@ class ArrayInsertOp(Op):
     def is_array_insert(self):
         return True
 
-    def get_properties_shifted_by_hazards(self, cs):
+    def get_properties_shifted_by_hazards(self, op):
         """
         Calculate how this op should be handled by a future op, accounting
         for any hazards that need to be applied.
         """
-        hazards = self.get_relevant_hazards(cs)
+        hazards = self.get_relevant_hazards(op)
         past_t_offset = self.t_offset
         for hazard in hazards:
             past_t_offset += hazard.get_offset_shift()
         return self.t_path, past_t_offset, self.t_val
+
+    def string_insert_transform(self, op):
+        """
+        This is being transformed by a past String Insert. There is no way for
+        a string insert to transform this op. This only needs to determine if a
+        Hazard is created for the past Op.
+        """
+        hazard = False
+        past_t_path = op.past_t_path[:]
+
+        if len(past_t_path) < len(self.t_path):
+            pass
+        elif self.t_path == past_t_path[:len(self.t_path)]:
+            index = past_t_path[len(self.t_path)]
+            if index >= self.t_offset:
+                past_t_path[len(self.t_path)] = index + len(self.t_val)
+                hazard = Hazard(op, self, path_shift=past_t_path)
+
+        return hazard
 
     def array_insert_transform(self, op):
         """
@@ -42,7 +61,7 @@ class ArrayInsertOp(Op):
         """
         hazard = False
         past_t_path, past_t_offset, past_t_val = \
-            op.get_properties_shifted_by_hazards(self.get_changeset())
+            op.past_t_path, op.past_t_offset, op.past_t_val
 
         # when this path is shorter than the old one, nothing needs to be done.
         if len(self.t_path) < len(past_t_path):
@@ -70,7 +89,7 @@ class ArrayInsertOp(Op):
         """
         hazard = False
         past_t_path, past_t_offset, past_t_val = \
-            op.get_properties_shifted_by_hazards(self.get_changeset())
+            op.get_properties_shifted_by_hazards(self)
 
         # when this path is shorter than the old one, nothing needs to be done.
         if len(self.t_path) < len(past_t_path):

@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from ..hazards.hazard import Hazard
-
+from copy import deepcopy
 
 class Op(object):
     """
@@ -80,7 +80,18 @@ class Op(object):
     def remove_old_hazards(self, css):
         self.hazards = [h for h in self.hazards if not h.conflict_cs in css]
 
-    def get_relevant_hazards(self, cs=None):
+    def get_relevant_hazards(self, op):
+        """
+        Filter all of the stored Hazards in this op to just the ones needed for
+        ot with the given Op.
+
+        :param op: The future :class:`Op` which is being transformed by this op
+        :rtype: list of :class:`Ops<Op>`
+        """
+        return [h for h in self.hazards
+                if self.hazard_is_relevant_for_ot(h, op)]
+
+    def hazard_is_relevant_for_ot(self, hazard, op):
         """
         Hazards stored in the op are only relevant when the conflic_cs is an
         acestor the changeset being transformed. For running tests, it is
@@ -88,12 +99,13 @@ class Op(object):
 
         TODO: THIS IS WHERE SHIT GETS UNUSABLY SLOW
         """
-        if cs is None:
-            return []
-
-        return [h for h in self.hazards
-                if cs is h.conflict_cs or
-                cs.has_ancestor(h.conflict_cs)]
+        cs = op.get_changeset()
+        if not cs:
+            return False
+        h = hazard
+        if not (cs is h.conflict_cs or cs.has_ancestor(h.conflict_cs)):
+            return False
+        return True
 
     def to_jsonable(self):
         s = [{'action': self.action}, {'path': self.path}]
@@ -111,11 +123,11 @@ class Op(object):
         return s
 
     def reset_transformations(self):
-        self.t_action = self.action
-        self.t_path = self.path
-        self.t_val = self.val
+        self.t_action = deepcopy(self.action)
+        self.t_path = deepcopy(self.path)
+        self.t_val = deepcopy(self.val)
         self.t_offset = self.offset
-        self.t_dest_path = self.dest_path
+        self.t_dest_path = deepcopy(self.dest_path)
         self.t_dest_offset = self.dest_offset
         self.noop = False
 
@@ -130,12 +142,24 @@ class Op(object):
                 continue
             func_name = self.json_opperations[op.action]
             transform_function = getattr(self, func_name)
+            op.process_for_future_ot(self)
             hazard = transform_function(op)
             if hazard:
                 op.add_new_hazard(hazard)
 
     def add_new_hazard(self, hazard):
         self.hazards.append(hazard)
+
+    def process_for_future_ot(self, op):
+        """
+        Prepare this Op for transforming a future Op by applying all
+        :class:`Hazards<Hazard>` and storing the resulting values.
+        """
+        past_t_path, past_t_offset, past_t_val = \
+            self.get_properties_shifted_by_hazards(op)
+        self.past_t_path = past_t_path
+        self.past_t_offset = past_t_offset
+        self.past_t_val = past_t_val
 
     def get_properties_shifted_by_hazards(self, cs):
         """
@@ -182,17 +206,18 @@ class Op(object):
         """
         Previous op was an array insert. Shift this ops path if necessary.
         """
+        hazard = False
+
         past_t_path, past_t_offset, past_t_val \
-            = op.get_properties_shifted_by_hazards(self.get_changeset())
+            = op.past_t_path, op.past_t_offset, op.past_t_val
 
         if len(self.t_path) <= len(past_t_path):
             return
-
         path_index = len(past_t_path)  # the only path peice that might move
         if past_t_path == self.t_path[:path_index]:
             if past_t_offset <= self.t_path[path_index]:
                 self.t_path[path_index] += len(past_t_val)
-        return
+        return hazard
 
     def array_delete_transform(self, op):
         """
@@ -201,7 +226,7 @@ class Op(object):
         range comes before the index for this op, shift the path.
         """
         past_t_path, past_t_offset, past_t_val \
-            = op.get_properties_shifted_by_hazards(self.get_changeset())
+            = op.get_properties_shifted_by_hazards(self)
 
         if len(self.t_path) <= len(past_t_path):
             return
@@ -222,7 +247,7 @@ class Op(object):
         result is either no change, or switch to noop
         """
         past_t_path, past_t_offset, past_t_val = \
-            op.get_properties_shifted_by_hazards(self.get_changeset())
+            op.get_properties_shifted_by_hazards(self)
         r = self.object_transformation(past_t_path, past_t_offset, past_t_val)
         return r
 
@@ -232,7 +257,7 @@ class Op(object):
         object deletion. Either this is fine or a noop.
         """
         past_t_path, past_t_offset, past_t_val = \
-            op.get_properties_shifted_by_hazards(self.get_changeset())
+            op.get_properties_shifted_by_hazards(self)
 
         r = self.object_transformation(past_t_path, past_t_offset, past_t_val)
         return r

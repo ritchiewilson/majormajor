@@ -39,14 +39,11 @@ class Hazard:
         self.base_cs = base_op.get_changeset()
         self.conflict_cs = conflict_op.get_changeset()
 
-        self.conflict_op_index = None
-        if self.conflict_cs:
-            ops = self.conflict_cs.get_ops()
-            self.conflict_op_index = ops.index(conflict_op)
-
-        self.base_op_index = None
-        if self.base_cs:
-            self.base_op_index = self.base_cs.get_ops().index(base_op)
+        self._is_string_hazard = (base_op.is_string_insert() or
+                                  base_op.is_string_delete())
+        self._is_array_hazard = (base_op.is_array_insert() or
+                                 base_op.is_array_delete())
+        self._is_path_hazard = not path_shift is None
 
     def get_conflict_op_index(self):
         return self.conflict_op_index
@@ -62,3 +59,12 @@ class Hazard:
 
     def get_val_shift(self):
         return self.val_shift
+
+    def is_string_hazard(self):
+        return self._is_string_hazard
+
+    def is_array_hazard(self):
+        return self._is_array_hazard
+
+    def is_path_hazard(self):
+        return self._is_path_hazard
