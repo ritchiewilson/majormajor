@@ -40,6 +40,26 @@ class ArrayInsertOp(Op):
         a string insert to transform this op. This only needs to determine if a
         Hazard is created for the past Op.
         """
+        hazard = self._get_path_hazard_for_past_op(op)
+        return hazard
+
+    def string_delete_transform(self, op):
+        """
+        This is being transformed by a past String Delete. There is no way for
+        a string delete to transform this op. This only needs to determine if a
+        Hazard is created for the past Op.
+        """
+        hazard = self._get_path_hazard_for_past_op(op)
+        return hazard
+
+    def _get_path_hazard_for_past_op(self, op):
+        """
+        Construct and return the path Hazard this Op creates when this is being
+        transformed by the given Op. If no Hazard is needed, return False.
+
+        :param op: Previous :class:`Op` this op is being transformed by
+        :returns: path :class:`Hazard` or False
+        """
         hazard = False
         past_t_path = op.past_t_path[:]
 

@@ -39,11 +39,8 @@ class Hazard:
         self.base_cs = base_op.get_changeset()
         self.conflict_cs = conflict_op.get_changeset()
 
-        self._is_string_hazard = (base_op.is_string_insert() or
-                                  base_op.is_string_delete())
-        self._is_array_hazard = (base_op.is_array_insert() or
-                                 base_op.is_array_delete())
         self._is_path_hazard = not path_shift is None
+        self._is_offset_hazard = path_shift is None
 
     def get_conflict_op_index(self):
         return self.conflict_op_index
@@ -68,3 +65,6 @@ class Hazard:
 
     def is_path_hazard(self):
         return self._is_path_hazard
+
+    def is_offset_hazard(self):
+        return self._is_offset_hazard

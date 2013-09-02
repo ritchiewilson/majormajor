@@ -34,20 +34,24 @@ class StringDeleteOp(Op):
         hazards = self.get_relevant_hazards(op)
         past_t_val = self.t_val
         past_t_offset = self.t_offset
+        past_t_path = self.t_path[:]
         for hazard in hazards:
-            past_t_val += hazard.get_val_shift()
-            past_t_offset += hazard.get_offset_shift()
-        return self.t_path, past_t_offset, past_t_val
+            if hazard.is_path_hazard():
+                past_t_path = hazard.get_path_shift()
+            elif hazard.is_offset_hazard():
+                past_t_val += hazard.get_val_shift()
+                past_t_offset += hazard.get_offset_shift()
+        return past_t_path, past_t_offset, past_t_val
 
     def string_insert_transform(self, op):
-        if self.t_path != op.t_path:
-            return
-
         past_t_path, past_t_offset, past_t_val \
-            = op.get_properties_shifted_by_hazards(self)
+            = op.past_t_path, op.past_t_offset, op.past_t_val
 
-        hazard = self.transform_delete_by_previous_insert(op, past_t_offset,
-                                                          past_t_val)
+        hazard = False
+        if self.t_path == past_t_path:
+            hazard = self.transform_delete_by_previous_insert(op,
+                                                              past_t_offset,
+                                                              past_t_val)
 
         return hazard
 
@@ -56,13 +60,13 @@ class StringDeleteOp(Op):
         Transform this opperation when a previously unknown opperation
         did a string deletion.
         """
-        if self.t_path != op.t_path:
-            return
-
         past_t_path, past_t_offset, past_t_val \
-            = op.get_properties_shifted_by_hazards(self)
+            = op.past_t_path, op.past_t_offset, op.past_t_val
 
-        hazard = self.transform_delete_by_previous_delete(op, past_t_offset,
-                                                          past_t_val)
+        hazard = False
+        if self.t_path == past_t_path:
+            hazard = self.transform_delete_by_previous_delete(op,
+                                                              past_t_offset,
+                                                              past_t_val)
 
         return hazard
