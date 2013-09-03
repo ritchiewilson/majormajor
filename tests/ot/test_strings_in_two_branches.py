@@ -62,8 +62,6 @@ class TestStringsInTwoBranches:
         b_index = doc.get_ordered_changesets().index(B0)
         assert a_index < b_index
         assert doc.get_snapshot() == '123456789'
-        assert opB0.t_offset == 6
-        assert opB0.t_val == 0
 
         # Partially overlaping delete
         B1 = Changeset(doc.get_id(), 'u2', [B0])
@@ -72,8 +70,6 @@ class TestStringsInTwoBranches:
         B1.set_id('B1')
         doc.receive_changeset(B1)
         assert doc.get_snapshot() == '1234569'
-        assert opB1.t_offset == 6
-        assert opB1.t_val == 2
 
         # Delete Range unaffected by branch A
         B2 = Changeset(doc.get_id(), 'u2', [B1])
@@ -82,8 +78,6 @@ class TestStringsInTwoBranches:
         B2.set_id('B2')
         doc.receive_changeset(B2)
         assert doc.get_snapshot() == '134569'
-        assert opB2.t_offset == 1
-        assert opB2.t_val == 1
 
         # combine these braches again
         C = Changeset(doc.get_id(), 'u2', [A1, B2])
@@ -119,8 +113,6 @@ class TestStringsInTwoBranches:
         b_index = doc.get_ordered_changesets().index(B0)
         assert a_index > b_index
         assert doc.get_snapshot() == '123456789'
-        assert opB0.t_offset == 4
-        assert opB0.t_val == 2
 
         B1 = Changeset(doc.get_id(), 'u2', [B0])
         opB1 = Op('sd', [], offset=6, val=2)
@@ -177,8 +169,6 @@ class TestStringsInTwoBranches:
         b_index = doc.get_ordered_changesets().index(B0)
         assert a_index < b_index
         assert doc.get_snapshot() == 'ab123cdefghik'
-        assert opB0.t_offset == 9
-        assert opB0.t_val == 1
 
         # Delete range partially overlaping range in A
         B1 = Changeset(doc.get_id(), 'u2', [B0])
@@ -187,8 +177,6 @@ class TestStringsInTwoBranches:
         B1.set_id('B1')
         doc.receive_changeset(B1)
         assert doc.get_snapshot() == 'ab123cdefghik'
-        assert opB1.t_offset == 11
-        assert opB1.t_val == 0
 
         # Delete Range unaffected by branch A
         B2 = Changeset(doc.get_id(), 'u2', [B1])
@@ -197,8 +185,6 @@ class TestStringsInTwoBranches:
         B2.set_id('B2')
         doc.receive_changeset(B2)
         assert doc.get_snapshot() == 'abcdefghik'
-        assert opB2.t_offset == 2
-        assert opB2.t_val == 3
 
         # combine these braches again
         C = Changeset(doc.get_id(), 'u2', [A2, B2])
@@ -241,8 +227,6 @@ class TestStringsInTwoBranches:
         b_index = doc.get_ordered_changesets().index(B0)
         assert a_index > b_index
         assert doc.get_snapshot() == 'ab123cdefghik'
-        assert opB0.t_offset == 8
-        assert opB0.t_val == 2
 
         # Delete range partially overlaping range in A
         B1 = Changeset(doc.get_id(), 'u2', [B0])
@@ -308,8 +292,6 @@ class TestStringsInTwoBranches:
         b_index = doc.get_ordered_changesets().index(B0)
         assert a_index < b_index
         assert doc.get_snapshot() == '0189'
-        assert opB0.t_offset == 2
-        assert opB0.t_val == 0
 
         # User saw '012789' and deleted '27', which was already
         # deleted in branch A.
@@ -319,8 +301,6 @@ class TestStringsInTwoBranches:
         B1.set_id('B1')
         doc.receive_changeset(B1)
         assert doc.get_snapshot() == '0189'
-        assert opB1.t_offset == 2
-        assert opB1.t_val == 0
 
         # Delete Range not known by branch A
         B2 = Changeset(doc.get_id(), 'u2', [B1])
@@ -329,8 +309,6 @@ class TestStringsInTwoBranches:
         B2.set_id('B2')
         doc.receive_changeset(B2)
         assert doc.get_snapshot() == '09'
-        assert opB2.t_offset == 1
-        assert opB2.t_val == 2
 
         # combine these braches again
         C = Changeset(doc.get_id(), 'u2', [A2, B2])
@@ -376,8 +354,6 @@ class TestStringsInTwoBranches:
         b_index = doc.get_ordered_changesets().index(B0)
         assert a_index > b_index
         assert doc.get_snapshot() == '0189'
-        assert opB0.t_offset == 3
-        assert opB0.t_val == 4
 
         # User saw '012789' and deleted '27'
         B1 = Changeset(doc.get_id(), 'u2', [B0])
@@ -445,8 +421,6 @@ class TestStringsInTwoBranches:
         b_index = doc.get_ordered_changesets().index(B0)
         assert a_index < b_index
         assert doc.get_snapshot() == '0189TARGET'
-        assert opB0.t_offset == 2
-        assert opB0.t_val == 0
 
         # User Saw '0156789TARGET', deleted '567', which branch A
         # already did.
@@ -455,10 +429,7 @@ class TestStringsInTwoBranches:
         B1.add_op(opB1)
         B1.set_id('B1')
         doc.receive_changeset(B1)
-
         assert doc.get_snapshot() == '0189TARGET'
-        assert opB1.t_offset == 2
-        assert opB1.t_val == 0
 
         # User Saw '0189TARGET', deleted '0189', which branch A has
         # NOT done.
@@ -468,8 +439,6 @@ class TestStringsInTwoBranches:
         B2.set_id('B2')
         doc.receive_changeset(B2)
         assert doc.get_snapshot() == 'TARGET'
-        assert opB2.t_offset == 0
-        assert opB2.t_val == 4
 
     def test_delete_overlaping_ranges2_reversed(self):
         """
@@ -512,8 +481,6 @@ class TestStringsInTwoBranches:
         b_index = doc.get_ordered_changesets().index(B0)
         assert a_index > b_index
         assert doc.get_snapshot() == '0189TARGET'
-        assert opB0.t_offset == 2
-        assert opB0.t_val == 3
 
         # User Saw '0156789TARGET', deleted '567', which branch A
         # already did.
@@ -588,8 +555,6 @@ class TestStringsInTwoBranches:
         b_index = doc.get_ordered_changesets().index(B0)
         assert a_index < b_index
         assert doc.get_snapshot() == 'The Quick '
-        assert opB0.t_offset == 10
-        assert opB0.t_val == 5
 
         # User B saw only the Y's and inserted text at the end.
         B1 = Changeset(doc.get_id(), 'u2', [B0])
@@ -598,7 +563,6 @@ class TestStringsInTwoBranches:
         B1.set_id('B1')
         doc.receive_changeset(B1)
         assert doc.get_snapshot() == 'The Quick Brown Fox.'
-        assert opB1.t_offset == 10
 
     def test_overlaping_deletes_then_string_insert_reversed(self):
         """
@@ -647,8 +611,6 @@ class TestStringsInTwoBranches:
         b_index = doc.get_ordered_changesets().index(B0)
         assert a_index > b_index
         assert doc.get_snapshot() == 'The Quick '
-        assert opB0.t_offset == 7
-        assert opB0.t_val == 30
 
         B1 = Changeset(doc.get_id(), 'u2', [B0])
         opB1 = Op('si', [], offset=7, val='Brown Fox.')
@@ -656,7 +618,6 @@ class TestStringsInTwoBranches:
         B1.set_id('B1')
         doc.receive_changeset(B1)
         assert doc.get_snapshot() == 'Brown Fox.The Quick '
-        assert opB1.t_offset == 7
 
     def test_completely_overlaping_deletes(self):
         """
@@ -703,8 +664,6 @@ class TestStringsInTwoBranches:
         B0.set_id('B')
         doc.receive_changeset(B0)
         assert doc.get_snapshot() == 'abcdef'
-        op = B0.get_ops()[0]
-        assert op.t_offset == 5
 
         # CS with overlapping delete range
         B1 = Changeset(doc.get_id(), 'u2', [B0])
@@ -713,22 +672,12 @@ class TestStringsInTwoBranches:
         B1.add_op(Op('si', [], offset=2, val='hi'))
         B1.set_id('B1')
         doc.receive_changeset(B1)
-        op0, op1, op2 = B1.get_ops()
-        assert op0.t_offset == 5
-        assert op0.t_val == 0
-        assert op1.t_offset == 6
-        assert op1.t_val == 'g'
-        assert op2.t_offset == 7
-        assert op2.t_val == 'hi'
         assert doc.get_snapshot() == 'abcdefghi'
 
         B2 = Changeset(doc.get_id(), 'u2', [B1])
         B2.add_op(Op('si', [], offset=4, val='jkl'))
         B2.set_id('B2')
         doc.receive_changeset(B2)
-        op = B2.get_ops()[0]
-        assert op.t_offset == 9
-        assert op.t_val == 'jkl'
         assert doc.get_snapshot() == 'abcdefghijkl'
 
         # combine these braches again
@@ -783,8 +732,6 @@ class TestStringsInTwoBranches:
         B0.set_id('B')
         doc.receive_changeset(B0)
         assert doc.get_snapshot() == '12345abcdef'
-        op = B0.get_ops()[0]
-        assert op.t_offset == 10
 
         # CS with overlapping delete range
         B1 = Changeset(doc.get_id(), 'u2', [B0])
@@ -793,22 +740,12 @@ class TestStringsInTwoBranches:
         B1.add_op(Op('si', [], offset=2, val='hi'))
         B1.set_id('B1')
         doc.receive_changeset(B1)
-        op0, op1, op2 = B1.get_ops()
-        assert op0.t_offset == 0
-        assert op0.t_val == 5
-        assert op1.t_offset == 6
-        assert op1.t_val == 'g'
-        assert op2.t_offset == 7
-        assert op2.t_val == 'hi'
         assert doc.get_snapshot() == 'abcdefghi'
 
         B2 = Changeset(doc.get_id(), 'u2', [B1])
         B2.add_op(Op('si', [], offset=4, val='jkl'))
         B2.set_id('B2')
         doc.receive_changeset(B2)
-        op = B2.get_ops()[0]
-        assert op.t_offset == 9
-        assert op.t_val == 'jkl'
         assert doc.get_snapshot() == 'abcdefghijkl'
 
         # combine these braches again

@@ -139,6 +139,8 @@ class Op(object):
         was not a dependency of this operation. This operation needs
         to be transformed to accomidate pc.
         """
+        if self.is_noop():
+            return
         for op in pc.get_ops():
             if op.is_noop():
                 continue
@@ -229,8 +231,8 @@ class Op(object):
         range, this becomes a noop. If the ops share a path, and the delete
         range comes before the index for this op, shift the path.
         """
-        past_t_path, past_t_offset, past_t_val \
-            = op.get_properties_shifted_by_hazards(self)
+        past_t_path, past_t_offset, past_t_val = \
+            op.past_t_path, op.past_t_offset, op.past_t_val
 
         if len(self.t_path) <= len(past_t_path):
             return

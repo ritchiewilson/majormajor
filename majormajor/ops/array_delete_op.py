@@ -119,7 +119,7 @@ class ArrayDeleteOp(Op):
         overlapping delete ranges (just like string deletes).
         """
         past_t_path, past_t_offset, past_t_val = \
-            op.get_properties_shifted_by_hazards(self)
+            op.past_t_path, op.past_t_offset, op.past_t_val
 
         hazard = False
         # if this path is smaller than the old one, there's no conflict

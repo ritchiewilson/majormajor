@@ -33,6 +33,9 @@ class StringInsertOp(Op):
         past_t_offset = self.t_offset
         past_t_path = self.t_path
         for hazard in hazards:
+            if hazard.is_noop_hazard():
+                self.past_t_noop = True
+                break
             if hazard.is_path_hazard():
                 past_t_path = hazard.get_path_shift()
             elif hazard.is_offset_hazard():

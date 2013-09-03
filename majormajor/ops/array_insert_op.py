@@ -108,7 +108,7 @@ class ArrayInsertOp(Op):
         """
         hazard = False
         past_t_path, past_t_offset, past_t_val = \
-            op.get_properties_shifted_by_hazards(self)
+            op.past_t_path, op.past_t_offset, op.past_t_val
 
         # when this path is shorter than the old one, nothing needs to be done.
         if len(self.t_path) < len(past_t_path):

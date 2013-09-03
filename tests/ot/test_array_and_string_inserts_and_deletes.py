@@ -15,6 +15,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
+This plays through a mix of array/string inserts and deletes in three
+branches. Each test in the class just mixed up the order of how branches A, B,
+and C are applied to the document.
+
+NOTE: these are far from simple unit tests. This was mostly a fishing
+expidition for bugs.
 """
 
 from majormajor.document import Document
@@ -91,10 +97,33 @@ class TestArrayAndStringInsertsAndDeletes:
         B3.add_op(Op('sd', [8], offset=1, val=1))  # to create 'SU'
         self.B3 = B3
 
-    def test_receive_A_first_with_A_ordered_first(self):
+        # Branch C does a different mix of ops. 1) string insert, 2) array
+        # delete 3) array insert, 4) string delete
+        C0 = Changeset(doc.get_id(), 'u1', [self.root])
+        C0.add_op(Op('si', [2], offset=1, val='XXX'))  # create 'GXXXHI'
+        C0.add_op(Op('si', [4], offset=2, val='YYY'))  # create 'MNYYYO'
+        C0.set_id('C')
+        self.C0 = C0
+
+        C1 = Changeset(doc.get_id(), 'u1', [C0])
+        C1.add_op(Op('ad', [], offset=4, val=2))  # Deletes ['MNYYYO', 'PQR']
+        C1.add_op(Op('ad', [], offset=6, val=1))  # Deletes ['YZ']
+        self.C1 = C1
+
+        C2 = Changeset(doc.get_id(), 'u1', [C1])
+        C2.add_op(Op('ai', [], offset=0, val=['lorem']))
+        C2.add_op(Op('ai', [], offset=6, val=['ipsum']))
+        self.C2 = C2
+
+        C3 = Changeset(doc.get_id(), 'u1', [C2])
+        C3.add_op(Op('sd', [5], offset=1, val=2))  # to delete 'TU'
+        C3.add_op(Op('sd', [6], offset=0, val=2))  # to create 'sum'
+        C3.add_op(Op('sd', [7], offset=2, val=1))  # to create 'VW'
+        self.C3 = C3
+
+    def test_order_branches_A_B_C(self):
         """
-        The document receives all of branch A before any of branch B, and
-        branch A should get ordered first.
+        Document will order the branches ABC
         """
         doc = self.doc
 
@@ -177,13 +206,62 @@ class TestArrayAndStringInsertsAndDeletes:
                   'VWX']
         assert doc.get_snapshot() == result
 
-    def test_receive_A_first_with_B_ordered_first(self):
+        # APPLY branch C
+        doc.receive_changeset(self.C0)
+        result = ['gh',
+                  '02',
+                  'GXXXHI',
+                  'lmn',
+                  'opqrst',
+                  '67890',
+                  'MabcuvwNYYYO',
+                  'PQR',
+                  'U',
+                  'VWX']
+        assert doc.get_snapshot() == result
+
+        doc.receive_changeset(self.C1)
+        result = ['gh',
+                  '02',
+                  'GXXXHI',
+                  'lmn',
+                  'opqrst',
+                  '67890',
+                  'U',
+                  'VWX']
+        assert doc.get_snapshot() == result
+
+        doc.receive_changeset(self.C2)
+        result = ['gh',
+                  '02',
+                  'GXXXHI',
+                  'lmn',
+                  'opqrst',
+                  '67890',
+                  'U',
+                  'ipsum',
+                  'VWX']
+        assert doc.get_snapshot() == result
+
+        doc.receive_changeset(self.C3)
+        result = ['gh',
+                  '02',
+                  'GXXXHI',
+                  'lmn',
+                  'opqrst',
+                  '67890',
+                  '',
+                  'sum',
+                  'VW']
+        assert doc.get_snapshot() == result
+
+    def test_order_branches_B_A_C(self):
         """
-        The document receives all of branch A before any of branch B, and
-        branch B should get ordered first.
         """
         doc = self.doc
 
+        # Force Branch A to be Second
+        self.A0.set_id('1A0')
         doc.receive_changeset(self.A0)
         doc.receive_changeset(self.A1)
         doc.receive_changeset(self.A2)
@@ -254,71 +332,187 @@ class TestArrayAndStringInsertsAndDeletes:
                   'VWX']
         assert doc.get_snapshot() == result
 
-    def test_interleave_branches_with_A_ordered_first(self):
+        # Branch C is applied third
+        doc.receive_changeset(self.C0)
+        result = ['gh',
+                  '02',
+                  'GXXXHI',
+                  'lmn',
+                  'opqrst',
+                  '67890',
+                  'MuvwabcNYYYO',
+                  'PQR',
+                  'U',
+                  'VWX']
+        assert doc.get_snapshot() == result
+
+        doc.receive_changeset(self.C1)
+        result = ['gh',
+                  '02',
+                  'GXXXHI',
+                  'lmn',
+                  'opqrst',
+                  '67890',
+                  'U',
+                  'VWX']
+        assert doc.get_snapshot() == result
+
+        doc.receive_changeset(self.C2)
+        result = ['gh',
+                  '02',
+                  'GXXXHI',
+                  'lmn',
+                  'opqrst',
+                  '67890',
+                  'U',
+                  'ipsum',
+                  'VWX']
+        assert doc.get_snapshot() == result
+
+        doc.receive_changeset(self.C3)
+        result = ['gh',
+                  '02',
+                  'GXXXHI',
+                  'lmn',
+                  'opqrst',
+                  '67890',
+                  '',
+                  'sum',
+                  'VW']
+        assert doc.get_snapshot() == result
+
+    def test_order_branches_C_B_A(self):
         """
         The document receives changesets from the two branches in a mixed
         order, and branch A should get ordered first.
         """
         doc = self.doc
 
+        # force branch C to be ordered first
+        self.C0.set_id('0C0')
+        doc.receive_changeset(self.C0)
+        doc.receive_changeset(self.C1)
+        doc.receive_changeset(self.C2)
+        doc.receive_changeset(self.C3)
+        result = ['lorem',
+                  'ABC',
+                  'DEF',
+                  'GXXXHI',
+                  'JKL',
+                  'S',
+                  'sum',
+                  'VW']
+        assert doc.get_snapshot() == result
+
+        # force branch B to be ordered second
+        self.B0.set_id('1B0')
         doc.receive_changeset(self.B0)
-        doc.receive_changeset(self.A0)
-        result = ['ghi',
+        result = ['lorem',
+                  'ghi',
                   'jkl',
                   'ABC',
-                  '012',
                   'DEF',
-                  'GHI',
+                  'GXXXHI',
                   'lmn',
                   'opq',
                   'JKL',
-                  '345',
-                  '678',
-                  'MNO',
-                  'PQR',
-                  'STU',
-                  'VWX',
-                  'YZ']
+                  'S',
+                  'sum',
+                  'VW']
         assert doc.get_snapshot() == result
 
-        doc.receive_changeset(self.A1)
         doc.receive_changeset(self.B1)
-        doc.receive_changeset(self.A2)
-        result = ['ghi',
-                  '012',
-                  'GHI',
+        result = ['lorem',
+                  'ghi',
+                  'DEF',
+                  'GXXXHI',
                   'lmn',
                   'opq',
-                  '67890',
-                  'MabcNO',
-                  'PQR',
-                  'STU',
-                  'VWX']
+                  'JKL',
+                  'S',
+                  'sum',
+                  'VW']
         assert doc.get_snapshot() == result
 
         doc.receive_changeset(self.B2)
-        doc.receive_changeset(self.A3)
-        result = ['ghi',
-                  '02',
-                  'GHI',
+        result = ['lorem',
+                  'ghi',
+                  'DEF',
+                  'GXXXHI',
                   'lmn',
                   'opqrst',
-                  '67890',
-                  'MabcuvwNO',
-                  'PQR',
-                  'U',
-                  'VWX']
+                  'xyzJKL',
+                  'S',
+                  'sum',
+                  'VW']
         assert doc.get_snapshot() == result
 
         doc.receive_changeset(self.B3)
-        result = ['gh',
-                  '02',
-                  'GHI',
+        result = ['lorem',
+                  'gh',
+                  'DEF',
+                  'GXXXHI',
+                  'lmn',
+                  'opqrst',
+                  'xyzJKL',
+                  'S',
+                  'sum',
+                  'VW']
+        assert doc.get_snapshot() == result
+
+        # force branch A to be last
+        self.A0.set_id('2A0')
+        doc.receive_changeset(self.A0)
+        result = ['lorem',
+                  'gh',
+                  '012',
+                  'DEF',
+                  'GXXXHI',
+                  'lmn',
+                  'opqrst',
+                  'xyzJKL',
+                  '345',
+                  '678',
+                  'S',
+                  'sum',
+                  'VW']
+        assert doc.get_snapshot() == result
+
+        doc.receive_changeset(self.A1)
+        result = ['lorem',
+                  'gh',
+                  '012',
+                  'GXXXHI',
+                  'lmn',
+                  'opqrst',
+                  '678',
+                  'S',
+                  'sum',
+                  'VW']
+        assert doc.get_snapshot() == result
+
+        doc.receive_changeset(self.A2)
+        result = ['lorem',
+                  'gh',
+                  '012',
+                  'GXXXHI',
                   'lmn',
                   'opqrst',
                   '67890',
-                  'MabcuvwNO',
-                  'PQR',
-                  'U',
-                  'VWX']
+                  'S',
+                  'sum',
+                  'VW']
+        assert doc.get_snapshot() == result
+
+        doc.receive_changeset(self.A3)
+        result = ['lorem',
+                  'gh',
+                  '02',
+                  'GXXXHI',
+                  'lmn',
+                  'opqrst',
+                  '67890',
+                  '',
+                  'sum',
+                  'VW']
         assert doc.get_snapshot() == result
