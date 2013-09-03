@@ -56,13 +56,13 @@ class StringInsertOp(Op):
         Transform this opperation when a previously unknown opperation
         did a string deletion.
         """
-        if self.t_path != op.t_path:
-            return
-
         past_t_path, past_t_offset, past_t_val = \
-            op.get_properties_shifted_by_hazards(self)
+            op.past_t_path, op.past_t_offset, op.past_t_val
 
-        hazard = self.transform_insert_by_previous_delete(op, past_t_offset,
-                                                          past_t_val)
+        hazard = False
+        if self.t_path == past_t_path:
+            hazard = self.transform_insert_by_previous_delete(op,
+                                                              past_t_offset,
+                                                              past_t_val)
 
         return hazard
