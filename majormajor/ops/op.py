@@ -20,7 +20,7 @@ from copy import deepcopy
 class Op(object):
     """
     offset is only used for string manipulation
-    
+
     """
     def __new__(cls, *args, **kwargs):
         subclass = {'si': StringInsertOp,
@@ -31,7 +31,7 @@ class Op(object):
                     'oi': ObjectInsertOp,
                     'od': ObjectDeleteOp,
                     'set': SetOp }.get(args[0], cls)
-        
+
         new_instance = object.__new__(subclass, *args, **kwargs)
         return new_instance
 
@@ -56,10 +56,13 @@ class Op(object):
         self.t_dest_path = dest_path
         self.t_dest_offset = dest_offset
         self.noop = False
+        self.reset_transformations()
 
         self.changeset = None
-        
+
         self.hazards = []
+
+        self.past_t_noop = False
 
     def set_changeset(self, cs):
         self.changeset = cs
@@ -142,6 +145,8 @@ class Op(object):
             func_name = self.json_opperations[op.action]
             transform_function = getattr(self, func_name)
             op.process_for_future_ot(self)
+            if op.past_t_noop:
+                continue
             hazard = transform_function(op)
             if hazard:
                 op.add_new_hazard(hazard)
@@ -176,7 +181,7 @@ class Op(object):
         """
         if self.is_noop() or op.is_noop():
             return
-            
+
         # If the set opperation was in the path of this op, this
         # becomes a noop. Otherwise fine
         op_path = op.get_transformed_path()
@@ -191,7 +196,7 @@ class Op(object):
         In the default case, pass
         """
         pass
-        
+
     def string_delete_transform(self, op):
         """
         Transform this opperation when a previously unknown opperation
@@ -496,11 +501,11 @@ class Op(object):
         'od': 'object_delete_transform'
     }
 
-    
+
 
 class SetOp(Op):
     pass
-    
+
 from .string_insert_op import StringInsertOp
 from .string_delete_op import StringDeleteOp
 from .string_move_op import StringMoveOp

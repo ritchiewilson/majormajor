@@ -73,6 +73,9 @@ class Snapshot:
         if not self.contains_path(op.t_path):
             return "ERROR!"
 
+        if op.is_noop():
+            return
+
         if op.is_string_move():
             self.string_move(op)
             return
@@ -86,7 +89,7 @@ class Snapshot:
 
     # JSON Opperation - wholesale replacing value at a given path
     def set_value(self, op):
-        return op.val
+        return copy.deepcopy(op.t_val)
 
     # JSON Opperation - Flip the value of the boolean at the given path
     def boolean_negation(self, op):

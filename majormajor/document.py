@@ -568,7 +568,7 @@ class Document:
         while index > 0 and not ocs[index].has_valid_snapshot_cache():
             index -= 1
         if index == 0:
-            s.set_snapshot = {}
+            s.set_snapshot({})
         else:
             s.set_snapshot(ocs[index].get_snapshot_cache())
             index += 1

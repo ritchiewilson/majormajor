@@ -34,8 +34,12 @@ class StringDeleteOp(Op):
         past_t_val = self.t_val
         past_t_offset = self.t_offset
         past_t_path = self.t_path[:]
+        self.past_t_noop = False
         for hazard in hazards:
-            if hazard.is_path_hazard():
+            if hazard.is_noop_hazard():
+                self.past_t_noop = True
+                break
+            elif hazard.is_path_hazard():
                 past_t_path = hazard.get_path_shift()
             elif hazard.is_offset_hazard():
                 past_t_val += hazard.get_val_shift()

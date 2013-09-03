@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
 from ..hazards.hazard import Hazard
 from .op import Op
 
@@ -34,6 +35,54 @@ class ArrayDeleteOp(Op):
             past_t_val += hazard.get_val_shift()
             past_t_offset += hazard.get_offset_shift()
         return self.t_path, past_t_offset, past_t_val
+
+    def string_insert_transform(self, op):
+        """
+        This is being transformed by a past String Insert. There is no way for
+        a string insert to transform this op. This only needs to determine if a
+        Hazard is created for the past Op.
+        """
+        hazard = self._get_path_hazard_for_past_op(op)
+        return hazard
+
+    def string_delete_transform(self, op):
+        """
+        This is being transformed by a past String Delete. There is no way for
+        a string delete to transform this op. This only needs to determine if a
+        Hazard is created for the past Op.
+        """
+        hazard = self._get_path_hazard_for_past_op(op)
+        return hazard
+
+    def _get_path_hazard_for_past_op(self, op):
+        """
+        Construct and return the Hazard this Op creates when this is being
+        transformed by the given Op. If no Hazard is needed, return False.
+
+        If the past op is beyond the delete range, a path hazard is created. If
+        the past op happens within the delete range, the past op gets a noop
+        hazard.
+
+        :param op: Previous :class:`Op` this op is being transformed by
+        :returns: :class:`Hazard` or False
+        """
+        hazard = False
+        past_t_path = op.past_t_path[:]
+
+        # when this path is shorter, there are no potential Hazards
+        if len(past_t_path) < len(self.t_path):
+            pass
+        elif self.t_path == past_t_path[:len(self.t_path)]:
+            index = past_t_path[len(self.t_path)]
+            if index >= self.t_offset + self.t_val:
+                # the past op was beyond the delete range, so the path shifts
+                past_t_path[len(self.t_path)] = index - self.t_val
+                hazard = Hazard(op, self, path_shift=past_t_path)
+            elif index >= self.t_offset:
+                # the past op was in the delete range, so does not need to be
+                # applied anymore.
+                hazard = Hazard(op, self, noop_shift=True)
+        return hazard
 
     def array_insert_transform(self, op):
         """
