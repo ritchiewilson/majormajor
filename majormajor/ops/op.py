@@ -82,17 +82,6 @@ class Op(object):
     def remove_old_hazards(self, css):
         self.hazards = [h for h in self.hazards if not h.conflict_cs in css]
 
-    def get_relevant_hazards(self, op):
-        """
-        Filter all of the stored Hazards in this op to just the ones needed for
-        ot with the given Op.
-
-        :param op: The future :class:`Op` which is being transformed by this op
-        :rtype: list of :class:`Ops<Op>`
-        """
-        return [h for h in self.hazards
-                if self.hazard_is_relevant_for_ot(h, op)]
-
     def hazard_is_relevant_for_ot(self, hazard, op):
         """
         Hazards stored in the op are only relevant when the conflic_cs is an
@@ -167,14 +156,30 @@ class Op(object):
         self.past_t_offset = past_t_offset
         self.past_t_val = past_t_val
 
-    def get_properties_shifted_by_hazards(self, cs):
+    def get_properties_shifted_by_hazards(self, op):
         """
         Calculate how this op should be handled by a future op, accounting
         for any hazards that need to be applied. This is overriden by
         each op. By default, there are no hazards, so just return these
         transformed properties.
         """
-        return self.t_path, self.t_offset, self.t_val
+        past_t_val = self.t_val
+        past_t_offset = self.t_offset
+        past_t_path = self.t_path[:]
+        self.past_t_noop = False
+        for hazard in self.hazards:
+            if not self.hazard_is_relevant_for_ot(hazard, op):
+                continue
+            if hazard.is_noop_hazard():
+                self.past_t_noop = True
+                break
+            if hazard.is_path_hazard():
+                past_t_path = hazard.get_path_shift()
+            if hazard.is_offset_hazard():
+                past_t_offset += hazard.get_offset_shift()
+            if hazard.is_val_hazard():
+                past_t_val += hazard.get_val_shift()
+        return past_t_path, past_t_offset, past_t_val
 
     def set_transform(self, op):
         """
@@ -328,7 +333,7 @@ class Op(object):
         #   |----- self ------|
         elif sre >= opre:
             overlap = past_t_val * -1
-            hazard = Hazard(op, self, val_shift=overlap)
+            hazard = Hazard(op, self, noop_shift=True)
             self.t_val -= past_t_val
         # case 6
         #      |-- prev op --|

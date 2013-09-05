@@ -22,30 +22,6 @@ class StringDeleteOp(Op):
     def is_string_delete(self):
         return True
 
-    def get_properties_shifted_by_hazards(self, op):
-        """
-        Calculate how this op should be handled by a future op, accounting
-        for any hazards that need to be applied. If this op's offset
-        is further in the text than the hazard, then this offset is
-        off by the size of hazard. If this op is the base of the
-        hazard, then it is telling a future op to delete too much.
-        """
-        hazards = self.get_relevant_hazards(op)
-        past_t_val = self.t_val
-        past_t_offset = self.t_offset
-        past_t_path = self.t_path[:]
-        self.past_t_noop = False
-        for hazard in hazards:
-            if hazard.is_noop_hazard():
-                self.past_t_noop = True
-                break
-            elif hazard.is_path_hazard():
-                past_t_path = hazard.get_path_shift()
-            elif hazard.is_offset_hazard():
-                past_t_val += hazard.get_val_shift()
-                past_t_offset += hazard.get_offset_shift()
-        return past_t_path, past_t_offset, past_t_val
-
     def string_insert_transform(self, op):
         past_t_path, past_t_offset, past_t_val \
             = op.past_t_path, op.past_t_offset, op.past_t_val

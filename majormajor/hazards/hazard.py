@@ -28,7 +28,7 @@ class Hazard:
 
     """
     def __init__(self, base_op, conflict_op, path_shift=None,
-                 offset_shift=0, val_shift=0, noop_shift=False):
+                 offset_shift=None, val_shift=None, noop_shift=False):
         self.base_op = base_op
         self.conflict_op = conflict_op
         self.path_shift = path_shift
@@ -40,7 +40,8 @@ class Hazard:
         self.conflict_cs = conflict_op.get_changeset()
 
         self._is_path_hazard = not path_shift is None
-        self._is_offset_hazard = path_shift is None
+        self._is_offset_hazard = not offset_shift is None
+        self._is_val_hazard = not val_shift is None
 
     def get_conflict_op_index(self):
         return self.conflict_op_index
@@ -68,6 +69,9 @@ class Hazard:
 
     def is_offset_hazard(self):
         return self._is_offset_hazard
+
+    def is_val_hazard(self):
+        return self._is_val_hazard
 
     def is_noop_hazard(self):
         return self.noop_shift

@@ -22,17 +22,6 @@ class ArrayInsertOp(Op):
     def is_array_insert(self):
         return True
 
-    def get_properties_shifted_by_hazards(self, op):
-        """
-        Calculate how this op should be handled by a future op, accounting
-        for any hazards that need to be applied.
-        """
-        hazards = self.get_relevant_hazards(op)
-        past_t_offset = self.t_offset
-        for hazard in hazards:
-            past_t_offset += hazard.get_offset_shift()
-        return self.t_path, past_t_offset, self.t_val
-
     def string_insert_transform(self, op):
         """
         This is being transformed by a past String Insert. There is no way for
