@@ -17,6 +17,7 @@
 import hashlib
 import json
 import random
+from collections import deque
 
 class Changeset:
     def __init__(self, doc_id, user, dependencies):
@@ -35,7 +36,7 @@ class Changeset:
 
     def is_empty(self):
         return len(self.ops) == 0
-    
+
     def get_parents(self):
         return self.parents[:]
 
@@ -58,7 +59,7 @@ class Changeset:
 
     def has_children(self):
         return not self.children == []
-    
+
     def is_snapshot_cache(self):
         return self._is_snapshot_cache
 
@@ -84,7 +85,7 @@ class Changeset:
         if boolean:
             self._has_valid_ancestor_cache = False
             self.ancestor_cache = None
-        
+
     def set_snapshot_cache(self, snapshot):
         self.snapshot_cache = snapshot
 
@@ -99,9 +100,13 @@ class Changeset:
 
     def get_ancestors(self):
         """
-        Recursively go through all parents to the document root to return
-        a set of all ancestors. If this changeset is an ancestor cache,
-        the set is saved.
+        Get a set of all this Changeset's ancestors back to the root changeset.
+
+        For changesets which hold caches of their ancestors, return it if it is
+        already set, and save it if it needs to be calculated.
+
+        :returns: All ancestors of this changeset
+        :rtype: set of :class:`Changesets`
         """
         if not self.has_full_dependency_info():
             raise Exception("Cannot get ancestor list without full dependency info.")
@@ -111,16 +116,22 @@ class Changeset:
             return self.ancestor_cache
 
         # otherwise, recursively find all ancestors
-        ancestors = set(self.parents)
-        for parent in self.parents:
-            ancestors.update(parent.get_ancestors())
+        still_to_check = deque(self.parents)
+        ancestors = set([])
+        while still_to_check:
+            cs = still_to_check.popleft()
+            ancestors.add(cs)
+            if cs._is_ancestor_cache and cs._has_valid_ancestor_cache:
+                ancestors.update(cs.get_ancestors())
+            else:
+                still_to_check.extend(cs.get_parents())
 
         # make sure this list is full and accurate before cacheing it
         if self._is_ancestor_cache:
             self._has_valid_ancestor_cache = True
             self.ancestor_cache = ancestors
         return ancestors
-        
+
     def has_ancestor(self, ancestor):
         if ancestor in self.parents:
             return True
@@ -168,7 +179,7 @@ class Changeset:
         Get the user who created this changeset.
         """
         return self.user
-            
+
     def set_id(self, id_):
         """
         Set the id of this document. Called when building a remote
@@ -176,7 +187,7 @@ class Changeset:
         """
         self.id_ = id_
         return True
-    
+
     def add_op(self, op):
         """
         Add an opperation to this changeset. Changesets should never
@@ -210,7 +221,7 @@ class Changeset:
             if parent in all_known_changesets:
                 all_known_changesets[parent]['obj'].add_child(self)
 
-                
+
     def relink_parent(self, cs):
         """
         Remove apropraite id string from parents list and replace it
@@ -228,7 +239,7 @@ class Changeset:
         stick it in.
         """
         self.preceding_changesets = css
-    
+
     def get_unaccounted_changesets(self):
         """
         List of all the changes that happened before this changeset
@@ -274,7 +285,7 @@ class Changeset:
                 self.preceding_changesets.insert(insertion_point, cs)
                 break
             i += 1
-        
+
     def ot(self):
         """
         All the unaccounted changesets should have already been
@@ -307,7 +318,7 @@ class Changeset:
              {'dep':self.get_dependency_ids()}, {'ops': op_list}]
         return j
 
-   
+
     def to_dict(self):
         """
         Build less verbose dict for just sending data. Not used for
@@ -318,7 +329,7 @@ class Changeset:
              'dep_ids': self.get_dependency_ids(),
              'ops': [op.to_dict() for op in self.ops]}
         return d
-        
+
     def get_id(self):
         """
         Creates an id by building a specific json representation of
