@@ -57,6 +57,7 @@ class Op(object):
         self.t_dest_offset = dest_offset
         self.noop = False
         self.reset_transformations()
+        self.reset_hazard_transformations()
 
         self.changeset = None
 
@@ -71,12 +72,93 @@ class Op(object):
         return self.changeset
 
     def get_path(self):
+        """
+        Get a copy of the orignal, unaltered path which was assigned to this
+        Op.
+        """
         return self.path[:]
 
     def get_transformed_path(self):
+        """
+        Get this Op's path after it has gone through all opperational
+        transformation. This is the path used when this Op is applied to the
+        documnet.
+        """
         return self.t_path[:]
 
+    def _get_hazard_shifted_path(self):
+        """
+        Get this Op's path as it will be when used in opperational
+        transformation with a future Op.
+
+        This value is only used during OT.
+        """
+        return self.past_t_path[:]
+
+    def get_offset(self):
+        """
+        Get the orignal, unaltered offset which was assigned to this Op.
+        """
+        return self.offset[:]
+
+    def get_transformed_offset(self):
+        """
+        Get this Op's offset after it has gone through all opperational
+        transformation. This is the offset used when this Op is applied to the
+        documnet.
+        """
+        return self.t_offset[:]
+
+    def _get_hazard_shifted_offset(self):
+        """
+        Get this Op's offset as it will be when used in opperational
+        transformation with a future Op.
+
+        This value is only used during OT.
+        """
+        return self.past_t_offset[:]
+
+    def get_val(self):
+        """
+        Get a copy of the orignal, unaltered val which was assigned to this Op.
+        """
+        return deepcopy(self.val)
+
+    def get_transformed_val(self):
+        """
+        Get this Op's val after it has gone through all opperational
+        transformation. This is the val used when this Op is applied to the
+        documnet.
+        """
+        return deepcopy(self.t_val)
+
+    def _get_hazard_shifted_val(self):
+        """
+        Get this Op's val as it will be when used in opperational
+        transformation with a future Op.
+
+        This value is only used during OT.
+        """
+        return deepcopy(self.past_t_val)
+
     def is_noop(self):
+        """
+        Returns if this Op has become a 'noop' due to opperational
+        transformation.
+
+        An Op becomes a 'no opperation', or 'noop', when it has gone through
+        OT, and previous opperations make this invalid or superfluous. For
+        example, this Op could become invalid if it should have happened within
+        a node which was deleted. It could become superfluous if, for example
+        this Op does a string delete which is effectively already covered in
+        previous string deletes.
+
+        Ops which have become a 'noop' will be skipped when applied to the
+        document.
+
+        :returns: If this Op should be skipped when applied to a document
+        :rtype: bool
+        """
         return self.noop
 
     def remove_old_hazards(self, css=[], purge=False):
@@ -117,6 +199,11 @@ class Op(object):
         return s
 
     def reset_transformations(self):
+        """
+        Reset how this Op will be applied to the document by reseting its
+        tranformed values to the original values. This is typically only done
+        at the begining of this Op's opperational transformation.
+        """
         self.t_action = deepcopy(self.action)
         self.t_path = deepcopy(self.path)
         self.t_val = deepcopy(self.val)
@@ -124,6 +211,19 @@ class Op(object):
         self.t_dest_path = deepcopy(self.dest_path)
         self.t_dest_offset = self.dest_offset
         self.noop = False
+
+    def reset_hazard_transformations(self):
+        """
+        Reset how this Op will be used in opperational transformation with a
+        future Op.
+        """
+        self.past_t_action = deepcopy(self.t_action)
+        self.past_t_path = deepcopy(self.t_path)
+        self.past_t_val = deepcopy(self.t_val)
+        self.past_t_offset = self.t_offset
+        self.past_t_dest_path = deepcopy(self.t_dest_path)
+        self.past_t_dest_offset = self.t_dest_offset
+        self.past_t_noop = False
 
     def ot(self, pc):
         """
@@ -148,41 +248,27 @@ class Op(object):
     def add_new_hazard(self, hazard):
         self.hazards.append(hazard)
 
+    def apply_hazard(self, hazard):
+        if hazard.is_noop_hazard():
+            self.past_t_noop = True
+        if hazard.is_path_hazard():
+            self.past_t_path = hazard.get_path_shift()
+        if hazard.is_offset_hazard():
+            self.past_t_offset += hazard.get_offset_shift()
+        if hazard.is_val_hazard():
+            self.past_t_val += hazard.get_val_shift()
+
     def process_for_future_ot(self, op):
         """
         Prepare this Op for transforming a future Op by applying all
         :class:`Hazards<Hazard>` and storing the resulting values.
         """
-        past_t_path, past_t_offset, past_t_val = \
-            self.get_properties_shifted_by_hazards(op)
-        self.past_t_path = past_t_path
-        self.past_t_offset = past_t_offset
-        self.past_t_val = past_t_val
-
-    def get_properties_shifted_by_hazards(self, op):
-        """
-        Calculate how this op should be handled by a future op, accounting
-        for any hazards that need to be applied. This is overriden by
-        each op. By default, there are no hazards, so just return these
-        transformed properties.
-        """
-        past_t_val = self.t_val
-        past_t_offset = self.t_offset
-        past_t_path = self.t_path[:]
-        self.past_t_noop = False
+        self.reset_hazard_transformations()
         for hazard in self.hazards:
-            if not self.hazard_is_relevant_for_ot(hazard, op):
-                continue
-            if hazard.is_noop_hazard():
-                self.past_t_noop = True
+            if self.hazard_is_relevant_for_ot(hazard, op):
+                self.apply_hazard(hazard)
+            if self.past_t_noop:
                 break
-            if hazard.is_path_hazard():
-                past_t_path = hazard.get_path_shift()
-            if hazard.is_offset_hazard():
-                past_t_offset += hazard.get_offset_shift()
-            if hazard.is_val_hazard():
-                past_t_val += hazard.get_val_shift()
-        return past_t_path, past_t_offset, past_t_val
 
     def set_transform(self, op):
         """
