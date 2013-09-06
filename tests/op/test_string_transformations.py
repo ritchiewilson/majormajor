@@ -38,13 +38,13 @@ class TestStringTransformations:
         op2 = Op('si', [], offset=2, val="XYZ")
         op2.ot(cs1)
         assert op2.t_offset == 2
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # op3 happens at an equal offset, so should be pushed forward
         op2 = Op('si', [], offset=3, val="XYZ")
         op2.ot(cs1)
         assert op2.t_offset == 6
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # op4 happens at a later offset, so should be pushed forward
         op2 = Op('si', [], offset=5, val="XYZ")
@@ -61,14 +61,14 @@ class TestStringTransformations:
         op2.ot(cs1)
         assert op2.t_offset == 0
         assert op2.t_val == 3
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # this deletion should expand to delete inserted text as well.
         op3 = Op('sd', [], offset=2, val=2)
         op3.ot(cs1)
         assert op3.t_offset == 2
         assert op3.t_val == 5
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # edge case, don't delete text if don't have have to. Shift
         # delete range.
@@ -76,7 +76,7 @@ class TestStringTransformations:
         op4.ot(cs1)
         assert op4.t_offset == 6
         assert op4.t_val == 2
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # insertion was at lower index. shift delete range forward.
         op5 = Op('sd', [], offset=4, val=2)
@@ -96,7 +96,7 @@ class TestStringTransformations:
         op2.ot(cs1)
         assert op2.t_offset == 1
         assert op2.t_val == 2
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # The end of op3 overlaps the start of op 1
         #          |-- op1 --|
@@ -105,7 +105,7 @@ class TestStringTransformations:
         op3.ot(cs1)
         assert op3.t_offset == 2
         assert op3.t_val == 1
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # op1 range is encompased by op 4 range
         #     |-- op1 --|
@@ -114,7 +114,7 @@ class TestStringTransformations:
         op4.ot(cs1)
         assert op4.t_offset == 2
         assert op4.t_val == 3
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # op5 range is encompased by op1 range
         #   |---- op1 ----|
@@ -123,7 +123,7 @@ class TestStringTransformations:
         op5.ot(cs1)
         assert op5.t_offset == 3
         assert op5.t_val == 0
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # start of op6 range overlaps end of op1 range
         #   |-- op1 --|
@@ -132,7 +132,7 @@ class TestStringTransformations:
         op6.ot(cs1)
         assert op6.t_offset == 3
         assert op6.t_val == 2
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # start of op7 range is after start of op1 range
         #   |-- op1 --|
@@ -152,21 +152,21 @@ class TestStringTransformations:
         op2.ot(cs1)
         assert op2.t_offset == 2
         assert op2.t_val == "ABC"
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # edge case. avoid deleting
         op3 = Op('si', [], offset=3, val="ABC")
         op3.ot(cs1)
         assert op3.t_offset == 3
         assert op3.t_val == "ABC"
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # text was put into delete range, so get rid of it.
         op4 = Op('si', [], offset=4, val="ABC")
         op4.ot(cs1)
         assert op4.t_offset == 3
         assert op4.t_val == ""
-        op1.hazards = []
+        op1.remove_old_hazards(purge=True)
 
         # text is at edge after delete range
         op5 = Op('si', [], offset=6, val="ABC")

@@ -79,8 +79,11 @@ class Op(object):
     def is_noop(self):
         return self.noop
 
-    def remove_old_hazards(self, css):
-        self.hazards = [h for h in self.hazards if not h.conflict_cs in css]
+    def remove_old_hazards(self, css=[], purge=False):
+        if purge:
+            self.hazards = []
+        else:
+            self.hazards = [h for h in self.hazards if not h.conflict_cs in css]
 
     def hazard_is_relevant_for_ot(self, hazard, op):
         """
