@@ -377,6 +377,8 @@ class Document:
         self.ordered_changesets_set_cache.update([cs])
         self.open_changeset = None
         cs.set_unaccounted_changesets([])
+        if cs._is_ancestor_cache:
+            cs.get_ancestors()
         # clean out old dependencies, since this should be the only
         # one now
         self.dependencies = [cs]
