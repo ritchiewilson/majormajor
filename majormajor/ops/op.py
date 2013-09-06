@@ -258,7 +258,8 @@ class Op(object):
         result is either no change, or switch to noop
         """
         past_t_path, past_t_offset, past_t_val = \
-            op.get_properties_shifted_by_hazards(self)
+            op.past_t_path, op.past_t_offset, op.past_t_val
+
         r = self.object_transformation(past_t_path, past_t_offset, past_t_val)
         return r
 
@@ -268,7 +269,7 @@ class Op(object):
         object deletion. Either this is fine or a noop.
         """
         past_t_path, past_t_offset, past_t_val = \
-            op.get_properties_shifted_by_hazards(self)
+            op.past_t_path, op.past_t_offset, op.past_t_val
 
         r = self.object_transformation(past_t_path, past_t_offset, past_t_val)
         return r
