@@ -265,6 +265,7 @@ class Document:
             css = cs.get_parents()
             while css and len(response_css) < MAX_CHANGESETS:
                 cs = css.pop()
+                if not isinstance(cs, Changeset): continue
                 if not cs in response_css:
                     response_css.update([cs])
                     css.extend(cs.get_parents())
