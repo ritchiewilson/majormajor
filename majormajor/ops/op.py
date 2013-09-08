@@ -538,6 +538,7 @@ class Op(object):
         if self.t_offset + self.t_val > past_t_offset \
                 and self.t_offset < past_t_offset:
             self.t_val += len(past_t_val)
+            hazard = Hazard(op, self, noop_shift=True)
         # if the insertion comes before deletion range, shift deletion range
         # forward
         elif self.t_offset >= past_t_offset:
