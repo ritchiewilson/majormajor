@@ -56,13 +56,11 @@ class TestStringsInComplexBranches:
         for x in xrange(branch_length):
             # revert document to when it went as far as parent
             doc.rebuild_historical_document([parent])
-            insert = random.random() > 0.3
-            if not self.remaining_chars:
-                insert = False
-            if insert:
-                parent = self.build_random_string_insert(parent)
-            else:
-                parent = self.build_random_string_delete(parent)
+            cs = Changeset(doc.get_id(), 'u1', [parent])
+            op = self.build_random_insert_or_delete()
+            cs.add_op(op)
+            doc.receive_changeset(cs)
+            parent = cs
         # Pull back in all changesets
         doc.pull_from_pending_list()
 
@@ -77,7 +75,15 @@ class TestStringsInComplexBranches:
             cs = Changeset(doc.get_id(), 'u1', deps)
             doc.receive_changeset(cs)
 
-    def build_random_string_insert(self, parent):
+    def build_random_insert_or_delete(self):
+        insert = random.random() > 0.3
+        if not self.remaining_chars:
+            insert = False
+        if insert:
+            return self.build_random_string_insert()
+        return self.build_random_string_delete()
+
+    def build_random_string_insert(self):
         doc = self.doc
         snapshot = doc.get_snapshot()
 
@@ -111,12 +117,10 @@ class TestStringsInComplexBranches:
             r['after'].extend(list(val[i + 1:]))
             self.remaining_chars = self.remaining_chars.replace(char, '')
 
-        cs = Changeset(doc.get_id(), 'u1', [parent])
-        cs.add_op(Op('si', [], offset=offset, val=val))
-        doc.receive_changeset(cs)
-        return cs
+        op = Op('si', [], offset=offset, val=val)
+        return op
 
-    def build_random_string_delete(self, parent):
+    def build_random_string_delete(self):
         doc = self.doc
         snapshot = doc.get_snapshot()
 
@@ -137,10 +141,8 @@ class TestStringsInComplexBranches:
         deleted_chars = snapshot[offset:offset + val]
         for char in deleted_chars:
             self.results[char]['deleted'] = True
-        cs = Changeset(doc.get_id(), 'u1', [parent])
-        cs.add_op(Op('sd', [], offset=offset, val=val))
-        doc.receive_changeset(cs)
-        return cs
+        op = Op('sd', [], offset=offset, val=val)
+        return op
 
     def test_build_random_changesets(self):
         self.build_results_dict()
