@@ -28,22 +28,16 @@ Try the sample text editor in the scripts directory:
 $ python texteditor.py
 ```
 
-Then in a separate terminal, or separate computer on the same network,
-open another instance of the text editor bound to a different port:
+Then in a separate terminal, open another instance of the text editor:
 ```
-$ python texteditor.py 8080
+$ python texteditor.py
 ```
 
-You now have two text editors open and keeping each other in sync as
-you type. To really watch it fly, click the big red button in each
-text editor, and they will randomly insert and delete text.
+Open as many as you like.
 
-The save buttons dump the text buffers to files, so they can latter be
-compared (hopefully anti-climactically).
-```
-$ diff buffer-*.txt
-$
-```
+In any texteditor window, the green checkmark button will invite the others
+to work on the same document and keep in sync.
+
 
 Tests
 -----
@@ -77,5 +71,4 @@ Contact
 MajorMajor was created by Ritchie Wilson, wilson.ri@husky.neu.edu
 
 All info found at http://www.majormajor.org
-
 
