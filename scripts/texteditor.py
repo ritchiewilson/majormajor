@@ -28,6 +28,7 @@ from majormajor.majormajor import MajorMajor
 from majormajor.ops.op import Op
 
 
+
 class TextViewWindow(Gtk.Window):
 
     def __init__(self):
@@ -45,12 +46,12 @@ class TextViewWindow(Gtk.Window):
         self.glue_majormajor()
 
     def glue_majormajor(self):
-        
+
         i_id = self.textbuffer.connect('insert-text', self.insert_text_handler)
         d_id = self.textbuffer.connect('delete-range', self.delete_range_handler)
         self.majormajor_handlers = {'insert-text':i_id, 'delete-range':d_id}
 
-        
+
         self.majormajor = MajorMajor()
 
         self.majormajor.connect('remote-cursor-update', self.remote_cursor_update)
@@ -70,9 +71,14 @@ class TextViewWindow(Gtk.Window):
         self.document = self.majormajor.new_document(snapshot='')
         self.majormajor.announce()
 
+    def open_http_connection(self):
+        self.majormajor.open_http_connection()
+        self.document = self.majormajor.new_document(snapshot='')
+        self.majormajor.announce()
+
     def accept_invitation(self, doc):
         self.document = doc
-        
+
     def remote_cursor_update(self):
         buf = self.textbuffer
         for i in self.majormajor.connections:
@@ -296,23 +302,32 @@ class TextViewWindow(Gtk.Window):
     def on_justify_toggled(self, widget, justification):
         self.textview.set_justification(justification)
 
+    def win_shutdown(self, arg1, arg2):
+        self.majormajor.shutdown()
+        Gtk.main_quit()
+
 
 import argparse
 
 parser = argparse.ArgumentParser(description='Demo collaborative text editor.')
-parser.add_argument('-port', type=int)
+parser.add_argument('-UDPport', type=int)
 parser.add_argument('-mq', action='store_const', const=1)
+parser.add_argument('-http', action='store_const', const=1)
 args = parser.parse_args()
 
 win = TextViewWindow()
-win.connect("delete-event", Gtk.main_quit)
+win.connect("delete-event", win.win_shutdown)
 win.show_all()
-if args.port or (not args.port and not args.mq):
-    port = args.port if args.port else 8000
+# by default, use HTTP connection
+if not args.UDPport and not args.mq and not args.http:
+    win.open_http_connection()
+
+if args.UDPport:
+    port = args.UDPport
     win.open_default_connection(port)
 if args.mq:
     win.open_mq_connection()
+if args.http:
+    win.open_http_connection()
 
 Gtk.main()
-            
-    

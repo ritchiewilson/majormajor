@@ -65,6 +65,16 @@ class MajorMajor:
         c = RabbitMQConnection(callback=self.connection_callback)
         self.connections.append(c)
 
+    def open_http_connection(self):
+        GObject.threads_init()
+        from .connections.HTTP import HTTPConnection
+        c = HTTPConnection(callback=self.connection_callback)
+        self.connections.append(c)
+
+    def shutdown(self):
+        for c in self.connections:
+            c.shutdown()
+
     def pull_from_pending_lists(self):
         """
         Try to apply pending changesets in each document.
@@ -94,7 +104,7 @@ class MajorMajor:
                 self.send_changesets(doc=doc, css=css)
                 doc.clear_send_queue()
         return True
-            
+
     def new_document(self, doc_id=None, user=None, snapshot=None):
         """
         Create a new Document to add to the list of open
@@ -298,7 +308,7 @@ class MajorMajor:
         user = User(remote_msg.from_user)
         user.add_connections(remote_msg.conns)
         self.add_user(user)
-        self.announce(users=[user])
+        self.announce(users=[user], broadcast=False)
         return {}
 
     def send_snapshot(self, remote_msg):
@@ -419,7 +429,7 @@ class MajorMajor:
     def invite_all(self, doc):
         for user in self.remote_users.values():
             self.invite_to_document(doc, user)
-            
+
     def invite_to_document(self, doc, to_user):
         """
         Builds a message to invite another user to collaborate on a
@@ -471,7 +481,7 @@ class MajorMajor:
         """
         for c in self.connections:
             c.send(msg, users, broadcast)
-            
+
     def connect(self, signal, callback):
         """
         Let clients connect to MajorMajor by defining callbacks for
@@ -482,7 +492,7 @@ class MajorMajor:
     def receive_changeset(self, m):
         m['css'] = [m['cs']]
         return self.receive_changesets(m)
-    
+
     def receive_changesets(self, remote_msg=None, sent_cs_dicts=None,
                            doc=None, user=None):
         """
@@ -515,9 +525,9 @@ class MajorMajor:
 
         if not self.HAS_EVENT_LOOP:
             self.pull_from_pending_lists()
-        
+
         return msg
-            
+
     def update_missing_changesets(self, doc):
         if not doc in self.requested_changesets:
             self.requested_changesets[doc] = {}
@@ -537,11 +547,10 @@ class MajorMajor:
 
     def knows_user(self, user_id):
         return user_id in self.remote_users
-        
+
     signal_callbacks = {
         'receive-changeset' : [],
         'receive-snapshot' : [],
         'remote-cursor-update' : [],
         'accept-invitation': [],
         }
-

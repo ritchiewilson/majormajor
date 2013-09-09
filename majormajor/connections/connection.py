@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-    
+
 class Connection:
     """
     Extensible connection type. Users should be able to subclass
@@ -24,3 +24,6 @@ class Connection:
     """
     def __init__(self):
         self.users = []
+
+    def shutdown(self):
+        pass
