@@ -118,13 +118,16 @@ class HTTPConnection(Connection):
         for port in ports:
             url = "http://127.0.1.1:" + str(port)
             data = urllib.urlencode({'payload': msg.to_json()})
-            f = urllib.urlopen(url, data=data)
+            try:
+                urllib.urlopen(url, data=data)
+            except:
+                print("Could not connect to", url)
+                pass
 
     def _listen_callback(self, payload):
 
         """
         """
-        print type(payload['payload'][0])
         m = json.loads(payload['payload'][0])
         msg = Message(msg=m)
         self.on_receive_callback(msg)
