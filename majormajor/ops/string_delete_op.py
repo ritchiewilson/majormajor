@@ -22,6 +22,9 @@ class StringDeleteOp(Op):
     def is_string_delete(self):
         return True
 
+    def set_value_to_nil(self):
+        self.t_val = 0
+
     def string_insert_transform(self, op):
         past_t_path, past_t_offset, past_t_val \
             = op.past_t_path, op.past_t_offset, op.past_t_val

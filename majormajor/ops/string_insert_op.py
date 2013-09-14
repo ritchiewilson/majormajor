@@ -19,8 +19,12 @@ from .op import Op
 
 
 class StringInsertOp(Op):
+
     def is_string_insert(self):
         return True
+
+    def set_value_to_nil(self):
+        self.t_val = ''
 
     def string_insert_transform(self, op):
         past_t_path, past_t_offset, past_t_val = \

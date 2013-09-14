@@ -231,8 +231,6 @@ class Op(object):
         was not a dependency of this operation. This operation needs
         to be transformed to accomidate pc.
         """
-        if self.is_noop():
-            return
         for op in pc.get_ops():
             if op.is_noop():
                 continue
@@ -336,6 +334,7 @@ class Op(object):
             delete_range = xrange(past_t_offset, past_t_offset + past_t_val)
             if self.t_path[path_index] in delete_range:
                 self.noop = True
+                self.set_value_to_nil()
                 return
             if not self.t_path[path_index] < past_t_offset:
                 self.t_path[path_index] -= past_t_val
@@ -497,8 +496,7 @@ class Op(object):
         elif self.t_offset > past_t_offset:
             self.t_offset = past_t_offset
             vs = len(self.t_val)
-            # If string insert, blank val is '', for array it is []
-            self.t_val = '' if self.is_string_insert() else []
+            self.set_value_to_nil()
             self.noop = True
             hazard = Hazard(op, self, val_shift=vs)
         else:
