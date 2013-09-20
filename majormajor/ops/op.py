@@ -196,8 +196,8 @@ class Op(object):
                 return False
         return True
 
-    def add_val_shifting_op(self, op, offset=None, from_head=False):
-        self.val_shifting_ops.append((op, offset, from_head))
+    def add_val_shifting_op(self, op, offset_shift=0, val_shift=0):
+        self.val_shifting_ops.append((op, offset_shift, val_shift))
 
     def add_double_delete_hazard(self, hazard):
         op = hazard.get_conflict_op()
@@ -223,16 +223,13 @@ class Op(object):
         return self.is_array_insert() or self.is_array_delete()
 
     def get_extended_delete_range(self, cs):
-        extend_tail = 0
-        extend_head = 0
-        for shift_op, shift, head in self.val_shifting_ops:
+        start = self.t_offset
+        val = self.t_val
+        for shift_op, offset_shift, val_shift in self.val_shifting_ops:
             if not cs.has_ancestor(shift_op.get_changeset()):
-                if head:
-                    extend_head += shift
-                else:
-                    extend_tail += shift
-        start = self.t_offset - extend_head
-        stop = self.t_offset + self.t_val + extend_tail
+                start += offset_shift
+                val += val_shift
+        stop = start + val
         return start, stop
 
     def to_jsonable(self):
@@ -471,16 +468,20 @@ class Op(object):
             overlap = srs - opre
             hazard = Hazard(op, self, val_shift=overlap)
             self.t_val += (self.t_offset - (past_t_offset + past_t_val))
+            offset_shift = self.t_offset - past_t_offset
             self.t_offset = past_t_offset
+            self.add_val_shifting_op(op, offset_shift, overlap * -1)
         # case 4
         #   |--- prev op ---|
         #     |-- self --|
         elif srs >= oprs and sre <= opre:
             overlap = srs - sre
             hazard = Hazard(op, self, val_shift=overlap)
+            offset_shift = self.t_offset - past_t_offset
             self.t_offset = past_t_offset
             self.t_val = 0
             self.noop = True
+            self.add_val_shifting_op(op, offset_shift, overlap * -1)
         # case 5
         #     |-- prev op --|
         #   |----- self ------|
@@ -488,6 +489,7 @@ class Op(object):
             overlap = past_t_val * -1
             hazard = Hazard(op, self, noop_shift=True)
             self.t_val -= past_t_val
+            self.add_val_shifting_op(op, val_shift=past_t_val)
         # case 6
         #      |-- prev op --|
         #   |-- self --|
@@ -497,7 +499,8 @@ class Op(object):
             hazard = Hazard(op, self, offset_shift=offset_shift,
                             val_shift=overlap)
             self.t_val = past_t_offset - self.t_offset
-            self.add_val_shifting_op(op, overlap * -1, from_head=False)
+            val_shift = overlap * -1
+            self.add_val_shifting_op(op, val_shift=val_shift)
 
         return hazard
 
@@ -562,7 +565,9 @@ class Op(object):
         if op.must_check_full_delete_range(self):
             cs = self.get_changeset()
             start, stop = op.get_extended_delete_range(cs)
-            if start < self.t_offset and stop > self.t_offset:
+            insert_offset = self.t_offset
+            insert_offset += self.val_shifting_ops[0][1]
+            if start < insert_offset and stop > insert_offset:
                 # I got deleted twice
                 overlapping_op = self.val_shifting_ops[0][0]
                 s = len(self.val) * -1
@@ -571,11 +576,12 @@ class Op(object):
         if self.t_offset >= past_t_offset + past_t_val:
             self.t_offset -= past_t_val
         elif self.t_offset > past_t_offset:
-            #self.t_offset = past_t_offset
+            offset = self.t_offset - past_t_offset
+            self.t_offset = past_t_offset
             vs = len(self.t_val)
             self.set_value_to_nil()
             self.noop = True
-            self.add_val_shifting_op(op)
+            self.add_val_shifting_op(op, offset)
             hazard = Hazard(op, self, val_shift=vs)
         else:
             hazard = Hazard(op, self, offset_shift=len(self.t_val))
@@ -617,7 +623,9 @@ class Op(object):
         if self.must_check_full_delete_range(op):
             cs = op.get_changeset()
             start, stop = self.get_extended_delete_range(cs)
-            if start < op.t_offset and stop > op.t_offset:
+            insert_offset = op.t_offset
+            insert_offset += op.val_shifting_ops[0][1]
+            if start < insert_offset and stop > insert_offset:
                 overlapping_op = op.get_val_shifting_ops()[0][0]
                 s = len(op.get_val()) * -1
                 ddh = Hazard(overlapping_op, self, op, val_shift=s)
