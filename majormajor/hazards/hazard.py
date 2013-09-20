@@ -27,10 +27,12 @@ class Hazard:
     order to bring it in line for a future op's opperational transformation.
 
     """
-    def __init__(self, base_op, conflict_op, path_shift=None,
-                 offset_shift=None, val_shift=None, noop_shift=False):
+    def __init__(self, base_op, conflict_op, double_delete_op=None,
+                 path_shift=None, offset_shift=None, val_shift=None,
+                 noop_shift=False):
         self.base_op = base_op
         self.conflict_op = conflict_op
+        self.double_delete_op = double_delete_op
         self.path_shift = path_shift
         self.offset_shift = offset_shift
         self.val_shift = val_shift
@@ -42,9 +44,12 @@ class Hazard:
         self._is_path_hazard = not path_shift is None
         self._is_offset_hazard = not offset_shift is None
         self._is_val_hazard = not val_shift is None
+        self._is_between_branches = False
+        self._is_activatied = False
+        self._is_double_delete_hazard = not double_delete_op is None
 
-    def get_conflict_op_index(self):
-        return self.conflict_op_index
+    def get_conflict_op(self):
+        return self.conflict_op
 
     def get_base_op_index(self):
         return self.conflict_op_index
@@ -75,3 +80,6 @@ class Hazard:
 
     def is_noop_hazard(self):
         return self.noop_shift
+
+    def is_double_delete_hazard(self):
+        return self._is_double_delete_hazard

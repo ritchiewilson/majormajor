@@ -473,6 +473,28 @@ class Document:
         self.rebuild_snapshot()
         return True
 
+    def rebuild_historical_document(self, css):
+        self.dependencies = [self.root_changeset]
+        keep_css = set(css)
+        for cs in css:
+            keep_css.update(cs.get_ancestors())
+        keep_css.remove(self.root_changeset)
+
+        all_css = set(self.pending_new_changesets)
+        all_css.update(self.ordered_changesets[1:])
+        hold_css = all_css.copy()
+        for cs in all_css:
+            if cs in keep_css:
+                hold_css.remove(cs)
+
+        self.pending_new_changesets = list(keep_css)
+        self.ordered_changesets = [self.root_changeset]
+        self.ordered_changesets_set_cache = set([self.root_changeset])
+        self.pull_from_pending_list()
+        self.pending_new_changesets = list(hold_css)
+        self.ot()
+        self.rebuild_snapshot()
+
     def receive_snapshot(self, snapshot, root_dict, dep_dicts):
         """
         m is the dict coming straight from another user over
@@ -531,6 +553,7 @@ class Document:
         start onwards.
         """
         i = max(start, 1)
+        i = 0
         # any hazards past start point are not invalid.
         self.remove_old_hazards(i)
 
@@ -561,15 +584,17 @@ class Document:
                 return False
         return True
 
-    def rebuild_snapshot(self, index=0):
+    def rebuild_snapshot(self, ignore_cache=False):
         """
         Start from an empty {} document and rebuild it from each op in
         each changeset.
         """
+        index = 0
         s = self.snapshot
         ocs = self.ordered_changesets
-        while index > 0 and not ocs[index].has_valid_snapshot_cache():
-            index -= 1
+        if not ignore_cache:
+            while index > 0 and not ocs[index].has_valid_snapshot_cache():
+                index -= 1
         if index == 0:
             s.set_snapshot({})
         else:
@@ -705,6 +730,26 @@ class Document:
         return (cs is None or
                 set(cs.get_parents()) - tree_set_cache != set([]) or
                 cs in tree_set_cache)
+
+    def get_tree_dotfile(self, show_ops=False):
+        dotfile = "digraph G {\n"
+        for cs in self.ordered_changesets:
+            for child in cs.children:
+                dotfile += '"' + cs.get_short_id() + '" -> "'
+                dotfile += child.get_short_id() + '";\n'
+            dotfile += '"' + cs.get_short_id() + '" [label="'
+            dotfile += cs.get_short_id()
+            if len(cs.get_ops()) == 1 and show_ops:
+                op = cs.get_ops()[0]
+                dotfile += "\\nAction: " + str(op.action) + '\\n'
+                dotfile += "Offset: " + str(op.offset) + '\\n'
+                dotfile += "Val: " + str(op.val) + '\\n'
+                dotfile += "t_offset: " + str(op.t_offset) + '\\n'
+                dotfile += "t_val: " + str(op.t_val) + '\\n'
+                dotfile += "noop: " + str(op.noop)
+            dotfile += '"];\n'
+        dotfile += "}"
+        return dotfile
 
     def get_diff_opcode(self, old_state):
         """

@@ -62,8 +62,15 @@ class Op(object):
         self.changeset = None
 
         self.hazards = []
+        self.hazards_between_branches = []
+        self.valid_hazard_shifted_cache = False
+
+        self._delete_head_edge_case = False
+        self._delete_tail_edge_case = False
 
         self.past_t_noop = False
+
+        self.val_shifting_ops = []
 
     def set_changeset(self, cs):
         self.changeset = cs
@@ -165,7 +172,9 @@ class Op(object):
         if purge:
             self.hazards = []
         else:
-            self.hazards = [h for h in self.hazards if not h.conflict_cs in css]
+            self.hazards = [h for h in self.hazards
+                            if not h.conflict_cs in css]
+        self.reset_hazard_transformations()
 
     def hazard_is_relevant_for_ot(self, hazard, op):
         """
@@ -181,7 +190,50 @@ class Op(object):
         h = hazard
         if not (cs is h.conflict_cs or cs.has_ancestor(h.conflict_cs)):
             return False
+        if h.is_double_delete_hazard():
+            dd_cs = h.double_delete_op.get_changeset()
+            if not (cs is dd_cs or cs.has_ancestor(dd_cs)):
+                return False
         return True
+
+    def add_val_shifting_op(self, op, offset=None, from_head=False):
+        self.val_shifting_ops.append((op, offset, from_head))
+
+    def add_double_delete_hazard(self, hazard):
+        op = hazard.get_conflict_op()
+        i = 0
+        while i < len(self.hazards):
+            if self.hazards[i].get_conflict_op() == op:
+                break
+            i += 1
+        self.hazards.insert(i + 1, hazard)
+
+    def get_val_shifting_ops(self):
+        return self.val_shifting_ops[:]
+
+    def must_check_full_delete_range(self, op):
+        if not op.is_noop():
+            return False
+        killing_ops = op.get_val_shifting_ops()
+        if not killing_ops:
+            return False
+        k_op = killing_ops[0][0]
+        if k_op.is_string_insert() or k_op.is_string_delete():
+            return self.is_string_insert() or self.is_string_delete()
+        return self.is_array_insert() or self.is_array_delete()
+
+    def get_extended_delete_range(self, cs):
+        extend_tail = 0
+        extend_head = 0
+        for shift_op, shift, head in self.val_shifting_ops:
+            if not cs.has_ancestor(shift_op.get_changeset()):
+                if head:
+                    extend_head += shift
+                else:
+                    extend_tail += shift
+        start = self.t_offset - extend_head
+        stop = self.t_offset + self.t_val + extend_tail
+        return start, stop
 
     def to_jsonable(self):
         s = [{'action': self.action}, {'path': self.path}]
@@ -211,6 +263,7 @@ class Op(object):
         self.t_dest_path = deepcopy(self.dest_path)
         self.t_dest_offset = self.dest_offset
         self.noop = False
+        self.val_shifting_ops = []
 
     def reset_hazard_transformations(self):
         """
@@ -224,6 +277,7 @@ class Op(object):
         self.past_t_dest_path = deepcopy(self.t_dest_path)
         self.past_t_dest_offset = self.t_dest_offset
         self.past_t_noop = False
+        self.valid_hazard_shifted_cache = False
 
     def ot(self, pc):
         """
@@ -232,8 +286,8 @@ class Op(object):
         to be transformed to accomidate pc.
         """
         for op in pc.get_ops():
-            if op.is_noop():
-                continue
+            #if op.is_noop():
+            #    continue
             func_name = self.json_opperations[op.action]
             transform_function = getattr(self, func_name)
             op.process_for_future_ot(self)
@@ -244,7 +298,11 @@ class Op(object):
                 op.add_new_hazard(hazard)
 
     def add_new_hazard(self, hazard):
-        self.hazards.append(hazard)
+        if hazard._is_between_branches:
+            self.hazards_between_branches.append(hazard)
+        else:
+            self.hazards.append(hazard)
+        self.apply_hazard(hazard)
 
     def apply_hazard(self, hazard):
         if hazard.is_noop_hazard():
@@ -261,12 +319,18 @@ class Op(object):
         Prepare this Op for transforming a future Op by applying all
         :class:`Hazards<Hazard>` and storing the resulting values.
         """
+        cs = op.get_changeset()
+        if cs and not cs.is_singly_linked_with_parent():
+            self.valid_hazard_shifted_cache = False
+        #if self.valid_hazard_shifted_cache:
+        #    return
         self.reset_hazard_transformations()
         for hazard in self.hazards:
             if self.hazard_is_relevant_for_ot(hazard, op):
                 self.apply_hazard(hazard)
             if self.past_t_noop:
                 break
+        self.valid_hazard_shifted_cache = True
 
     def set_transform(self, op):
         """
@@ -433,6 +497,7 @@ class Op(object):
             hazard = Hazard(op, self, offset_shift=offset_shift,
                             val_shift=overlap)
             self.t_val = past_t_offset - self.t_offset
+            self.add_val_shifting_op(op, overlap * -1, from_head=False)
 
         return hazard
 
@@ -491,13 +556,26 @@ class Op(object):
         """
         hazard = False
 
+        in_delete_range = self.t_offset < past_t_offset + past_t_val and \
+                                  self.t_offset > past_t_offset
+
+        if op.must_check_full_delete_range(self):
+            cs = self.get_changeset()
+            start, stop = op.get_extended_delete_range(cs)
+            if start < self.t_offset and stop > self.t_offset:
+                # I got deleted twice
+                overlapping_op = self.val_shifting_ops[0][0]
+                s = len(self.val) * -1
+                hazard = Hazard(overlapping_op, op, self, val_shift=s)
+                overlapping_op.add_double_delete_hazard(hazard)
         if self.t_offset >= past_t_offset + past_t_val:
             self.t_offset -= past_t_val
         elif self.t_offset > past_t_offset:
-            self.t_offset = past_t_offset
+            #self.t_offset = past_t_offset
             vs = len(self.t_val)
             self.set_value_to_nil()
             self.noop = True
+            self.add_val_shifting_op(op)
             hazard = Hazard(op, self, val_shift=vs)
         else:
             hazard = Hazard(op, self, offset_shift=len(self.t_val))
@@ -531,10 +609,23 @@ class Op(object):
         """
         hazard = False
 
+        in_deletion_range = self.t_offset + self.t_val > past_t_offset and \
+                                     self.t_offset < past_t_offset
+
+        # first determine if this and some other past delete have overlapping
+        # ranges, which both delete the insert.
+        if self.must_check_full_delete_range(op):
+            cs = op.get_changeset()
+            start, stop = self.get_extended_delete_range(cs)
+            if start < op.t_offset and stop > op.t_offset:
+                overlapping_op = op.get_val_shifting_ops()[0][0]
+                s = len(op.get_val()) * -1
+                hazard = Hazard(overlapping_op, self, op, val_shift=s)
+                overlapping_op.add_double_delete_hazard(hazard)
+
         # if insertion was in this deletion range, expand the range to delete
         # that text as well.
-        if self.t_offset + self.t_val > past_t_offset \
-                and self.t_offset < past_t_offset:
+        if in_deletion_range:
             self.t_val += len(past_t_val)
             hazard = Hazard(op, self, noop_shift=True)
         # if the insertion comes before deletion range, shift deletion range

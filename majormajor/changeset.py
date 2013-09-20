@@ -233,6 +233,15 @@ class Changeset:
                 self.parents.remove(parent)
                 break
 
+    def is_singly_linked_with_parent(self):
+        parents = self.parents
+        if len(parents) != 1:
+            return False
+        parent = parents[0]
+        if not isinstance(parent, Changeset):
+            return False
+        return len(parent.get_children()) == 1
+
     def set_unaccounted_changesets(self, css):
         """
         Sometimes the changesets could be calculated elsewhere. Just
@@ -342,6 +351,9 @@ class Changeset:
             h.update(j.encode('utf-8'))
             self.id_ = h.hexdigest()
         return self.id_
+
+    def get_short_id(self):
+        return self.get_id()[:3]
 
     def __str__(self):
         """
