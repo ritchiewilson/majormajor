@@ -566,8 +566,8 @@ class Op(object):
                 # I got deleted twice
                 overlapping_op = self.val_shifting_ops[0][0]
                 s = len(self.val) * -1
-                hazard = Hazard(overlapping_op, op, self, val_shift=s)
-                overlapping_op.add_double_delete_hazard(hazard)
+                ddh = Hazard(overlapping_op, op, self, val_shift=s)
+                overlapping_op.add_double_delete_hazard(ddh)
         if self.t_offset >= past_t_offset + past_t_val:
             self.t_offset -= past_t_val
         elif self.t_offset > past_t_offset:
@@ -620,8 +620,8 @@ class Op(object):
             if start < op.t_offset and stop > op.t_offset:
                 overlapping_op = op.get_val_shifting_ops()[0][0]
                 s = len(op.get_val()) * -1
-                hazard = Hazard(overlapping_op, self, op, val_shift=s)
-                overlapping_op.add_double_delete_hazard(hazard)
+                ddh = Hazard(overlapping_op, self, op, val_shift=s)
+                overlapping_op.add_double_delete_hazard(ddh)
 
         # if insertion was in this deletion range, expand the range to delete
         # that text as well.
