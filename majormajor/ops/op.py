@@ -65,12 +65,13 @@ class Op(object):
         self.hazards_between_branches = []
         self.valid_hazard_shifted_cache = False
 
-        self._delete_head_edge_case = False
-        self._delete_tail_edge_case = False
+        self.extends_at_head = False
+        self.extends_at_tail = False
 
         self.past_t_noop = False
 
         self.val_shifting_ops = []
+        self.deletion_edges = []
 
     def set_changeset(self, cs):
         self.changeset = cs
@@ -199,6 +200,15 @@ class Op(object):
     def add_val_shifting_op(self, op, offset_shift=0, val_shift=0):
         self.val_shifting_ops.append((op, offset_shift, val_shift))
 
+    def add_deletion_edge(self, op, head=None, tail=None):
+        s = "Must specify if insert is at head or tail of delete range."
+        if head is tail:
+            raise Exception(s)
+        at_head = not tail if head is None else head
+        if not (at_head is True or at_head is False):
+            raise Exception(s)
+        self.deletion_edges.append((op, at_head))
+
     def add_double_delete_hazard(self, hazard):
         op = hazard.get_conflict_op()
         i = 0
@@ -232,6 +242,19 @@ class Op(object):
         stop = start + val
         return start, stop
 
+    def is_in_interbranch_deletion_range(self, op):
+        at_head_of_prev_op = self.deletion_edges[-1][1]
+        interbranch_del = None
+        for edge in self.deletion_edges:
+            if edge[1] != at_head_of_prev_op:
+                interbranch_del = edge[0]
+                break
+        if not interbranch_del:
+            return False
+        if at_head_of_prev_op:
+            return (interbranch_del.extends_at_tail or op.extends_at_head)
+        return (interbranch_del.extends_at_head or op.extends_at_tail)
+
     def to_jsonable(self):
         s = [{'action': self.action}, {'path': self.path}]
         if not self.val is None:
@@ -261,6 +284,7 @@ class Op(object):
         self.t_dest_offset = self.dest_offset
         self.noop = False
         self.val_shifting_ops = []
+        self.deletion_edges = []
 
     def reset_hazard_transformations(self):
         """
@@ -471,6 +495,7 @@ class Op(object):
             offset_shift = self.t_offset - past_t_offset
             self.t_offset = past_t_offset
             self.add_val_shifting_op(op, offset_shift, overlap * -1)
+            self.extends_at_head = True
         # case 4
         #   |--- prev op ---|
         #     |-- self --|
@@ -482,6 +507,8 @@ class Op(object):
             self.t_val = 0
             self.noop = True
             self.add_val_shifting_op(op, offset_shift, overlap * -1)
+            #self.extends_at_head = False
+            #self.extends_at_tail = False
         # case 5
         #     |-- prev op --|
         #   |----- self ------|
@@ -501,6 +528,7 @@ class Op(object):
             self.t_val = past_t_offset - self.t_offset
             val_shift = overlap * -1
             self.add_val_shifting_op(op, val_shift=val_shift)
+            self.extends_at_tail = True
 
         return hazard
 
@@ -573,18 +601,34 @@ class Op(object):
                 s = len(self.val) * -1
                 ddh = Hazard(overlapping_op, op, self, val_shift=s)
                 overlapping_op.add_double_delete_hazard(ddh)
-        if self.t_offset >= past_t_offset + past_t_val:
+
+        def delete_self(s):
+            offset = s.t_offset - past_t_offset
+            s.t_offset = past_t_offset
+            vs = len(s.t_val)
+            s.set_value_to_nil()
+            s.noop = True
+            s.add_val_shifting_op(op, offset)
+            h = Hazard(op, s, val_shift=vs)
+            return h
+
+        # If this insertion is exactly at the edge of the past delete, see if
+        # it falls into an interbranch delete range. If it does, make this a
+        # noop, otherwise, shift as normal.
+        if self.t_offset == past_t_offset + past_t_val:
+            self.add_deletion_edge(op, tail=True)
+            if self.is_in_interbranch_deletion_range(op):
+                hazard = delete_self(self)
+            else:
+                self.t_offset -= past_t_val
+        elif self.t_offset > past_t_offset + past_t_val:
             self.t_offset -= past_t_val
         elif self.t_offset > past_t_offset:
-            offset = self.t_offset - past_t_offset
-            self.t_offset = past_t_offset
-            vs = len(self.t_val)
-            self.set_value_to_nil()
-            self.noop = True
-            self.add_val_shifting_op(op, offset)
-            hazard = Hazard(op, self, val_shift=vs)
+            hazard = delete_self(self)
         else:
             hazard = Hazard(op, self, offset_shift=len(self.t_val))
+            if self.t_offset == past_t_offset:
+                self.add_deletion_edge(op, head=True)
 
         return hazard
 
@@ -636,9 +680,27 @@ class Op(object):
         if in_deletion_range:
             self.t_val += len(past_t_val)
             hazard = Hazard(op, self, noop_shift=True)
+        # if insertion is exactly at start of deletion range, check if this is
+        # part of an interbranch delete range. If so, delete. Otherwise shift
+        # like normal.
+        elif self.t_offset == past_t_offset:
+            op.add_deletion_edge(self, head=True)
+            if op.is_in_interbranch_deletion_range(self):
+                self.t_val += len(past_t_val)
+                hazard = Hazard(op, self, noop_shift=True)
+            else:
+                self.t_offset += len(past_t_val)
+        elif self.t_offset + self.t_val == past_t_offset:
+            op.add_deletion_edge(self, tail=True)
+            if op.is_in_interbranch_deletion_range(self):
+                self.t_val += len(past_t_val)
+                hazard = Hazard(op, self, noop_shift=True)
+            else:
+                shift = self.t_val * -1
+                hazard = Hazard(op, self, offset_shift=shift)
         # if the insertion comes before deletion range, shift deletion range
         # forward
-        elif self.t_offset >= past_t_offset:
+        elif self.t_offset > past_t_offset:
             self.t_offset += len(past_t_val)
         # Otherwise the past insertion has a higher index, so should be shifted
         # to come in line with current document.
