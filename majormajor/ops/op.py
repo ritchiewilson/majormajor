@@ -587,9 +587,6 @@ class Op(object):
         """
         hazard = False
 
-        in_delete_range = self.t_offset < past_t_offset + past_t_val and \
-                                  self.t_offset > past_t_offset
-
         if op.must_check_full_delete_range(self):
             cs = self.get_changeset()
             start, stop = op.get_extended_delete_range(cs)
@@ -621,14 +618,26 @@ class Op(object):
                 hazard = delete_self(self)
             else:
                 self.t_offset -= past_t_val
+        # This insert happens beyond the delete range, so it needs to be
+        # shifted back into place.
         elif self.t_offset > past_t_offset + past_t_val:
             self.t_offset -= past_t_val
+        # This insert is within a past delete range
         elif self.t_offset > past_t_offset:
             hazard = delete_self(self)
+        # If this insertion is exactly at the edge of the past delete, see if
+        # it falls into an interbranch delete range. If it does, make this a
+        # noop, otherwise, shift as normal.
+        elif self.t_offset == past_t_offset:
+            self.add_deletion_edge(op, head=True)
+            if self.is_in_interbranch_deletion_range(op):
+                hazard = delete_self(self)
+            else:
+                hazard = Hazard(op, self, offset_shift=len(self.t_val))
+        # Otherwise this insert is at a lower index than the delete range, so
+        # just create a hazard.
         else:
             hazard = Hazard(op, self, offset_shift=len(self.t_val))
-            if self.t_offset == past_t_offset:
-                self.add_deletion_edge(op, head=True)
 
         return hazard
 
