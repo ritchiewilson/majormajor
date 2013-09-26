@@ -232,9 +232,9 @@ class Op(object):
             return self.is_string_insert() or self.is_string_delete()
         return self.is_array_insert() or self.is_array_delete()
 
-    def get_extended_delete_range(self, cs):
-        start = self.t_offset
-        val = self.t_val
+    def get_extended_delete_range(self, cs, past_del=False):
+        start = self.past_t_offset if past_del else self.t_offset
+        val = self.past_t_val if past_del else self.t_val
         for shift_op, offset_shift, val_shift in self.val_shifting_ops:
             if not cs.has_ancestor(shift_op.get_changeset()):
                 start += offset_shift
@@ -250,6 +250,8 @@ class Op(object):
                 interbranch_del = edge[0]
                 break
         if not interbranch_del:
+            return False
+        if interbranch_del.t_val == 0 or op.t_val == 0:
             return False
         if at_head_of_prev_op:
             return (interbranch_del.extends_at_tail or op.extends_at_head)
@@ -285,6 +287,8 @@ class Op(object):
         self.noop = False
         self.val_shifting_ops = []
         self.deletion_edges = []
+        self.extends_at_head = False
+        self.extends_at_tail = False
 
     def reset_hazard_transformations(self):
         """
@@ -447,6 +451,52 @@ class Op(object):
         r = self.object_transformation(past_t_path, past_t_offset, past_t_val)
         return r
 
+    def flag_interbranch_overlapping_deletes(self, op):
+        """Check if deletes from three branches are trying to delete some of the same
+        characters or array elements. First, get what each of these delete
+        ranges should have looked like. Then see if they overlap. If they
+        overlap, and any of the same delete ranges deleted both shift and op,
+        then three deletes are trying to get the same data.
+
+        """
+        # first get the two deletes intended ranges, and find their overlap
+        cs = self.get_changeset()
+        past_start, past_stop = op.get_extended_delete_range(cs, past_del=True)
+        self_start, self_stop = \
+            self.get_extended_delete_range(op.get_changeset(), past_del=False)
+        overlap = 0
+        if past_start <= self_start and self_start < past_stop:
+            if self_stop < past_stop:
+                overlap = self_stop - self_start
+            else:
+                overlap = past_stop - self_start
+        elif self_start <= past_start and self_stop > past_start:
+            if self_stop < past_stop:
+                overlap = self_stop - past_start
+            else:
+                overlap = past_stop - past_start
+        if overlap == 0:
+            return
+
+        # if any of the same ops deleted them both, then there is some
+        # interbranch overlap.
+        ops_that_val_shifted_self = set([vso[0] for vso in
+                                        self.val_shifting_ops])
+        for shift_op, offset_shift, val_shift in op.get_val_shifting_ops():
+            if not shift_op in ops_that_val_shifted_self:
+                continue
+
+            self_val_shift = 0
+            for vso in self.val_shifting_ops:
+                if vso[0] == shift_op:
+                    self_val_shift = vso[2]
+                    break
+            # the size of the three layered overlap is the min of any two of
+            # their overlaps.
+            size = min(overlap, self_val_shift, val_shift)
+            ddh = Hazard(shift_op, op, self, val_shift=size)
+            shift_op.add_double_delete_hazard(ddh)
+
     def transform_delete_by_previous_delete(self, op,
                                             past_t_offset, past_t_val):
         """
@@ -465,6 +515,9 @@ class Op(object):
         :returns: Hazard caused by this OT or False if not needed
         :rtype: Hazard or False
         """
+        # first check if these deletes would have overlapped if not shortend
+        self.flag_interbranch_overlapping_deletes(op)
+
         hazard = False
 
         srs = self.t_offset  # self range start
@@ -589,7 +642,7 @@ class Op(object):
 
         if op.must_check_full_delete_range(self):
             cs = self.get_changeset()
-            start, stop = op.get_extended_delete_range(cs)
+            start, stop = op.get_extended_delete_range(cs, past_del=True)
             insert_offset = self.t_offset
             insert_offset += self.val_shifting_ops[0][1]
             if start < insert_offset and stop > insert_offset:

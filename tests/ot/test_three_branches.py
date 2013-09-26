@@ -63,7 +63,6 @@ def test_insert_within_overlaping_deletes(insert_index, resulting_index,
                                           insert_first,
                                           low_index_in_0_branch):
 
-    if low_index_in_0_branch:return # or not insert_first: return
     doc = Document(snapshot='abcdefghijklmnopqrstuvwxyz')
     doc.HAS_EVENT_LOOP = False
 
@@ -102,12 +101,30 @@ def test_insert_within_overlaping_deletes(insert_index, resulting_index,
     assert doc.get_snapshot() == resulting_snapshot
 
 
+def test_insert_within_many_overlaping_deletes():
+    doc = Document(snapshot='abcdefghij')
+    doc.HAS_EVENT_LOOP = False
+    css_data = [
+        ('si', 5, 'X', ['root'], 'A'),  # should result in abcdeXfghij
+        ('sd', 4, 2, ['root'], 'B'),  # deletes 'ef'
+        ('sd', 3, 4, ['root'], 'C'),  # deletes 'defg'
+        ('si', 5, 'J', ['B', 'C'], 'D'),  # insert 'J' right before 'j'
+
+        ('sd', 3, 4, ['root'], 'E')  # deletes 'defg'
+    ]
+
+    css = build_changesets_from_tuples(css_data, doc)
+
+    for cs in css:
+        doc.receive_changeset(cs)
+    assert doc.get_snapshot() == 'abchiJj'
+
 params = [(i, True) for i in range(26)]
 params += [(i, False) for i in range(26)]
 
 
 @pytest.mark.parametrize(('delete_index', 'single_first'), params)
-def Xtest_overlaping_deletes2(delete_index, single_first):
+def test_overlaping_deletes(delete_index, single_first):
     original_snapshot = 'abcdefghijklmnopqrstuvwxyz'
     doc = Document(snapshot=original_snapshot)
     doc.HAS_EVENT_LOOP = False
