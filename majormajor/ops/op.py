@@ -245,10 +245,14 @@ class Op(object):
     def is_in_interbranch_deletion_range(self, op):
         at_head_of_prev_op = self.deletion_edges[-1][1]
         interbranch_del = None
+        op_vso = set([vso[0] for vso in op.get_val_shifting_ops()])
         for edge in self.deletion_edges:
             if edge[1] != at_head_of_prev_op:
+                if edge[0] in op_vso:
+                    return True
                 interbranch_del = edge[0]
-                break
+                #break
+        return False
         if not interbranch_del:
             return False
         if interbranch_del.t_val == 0 or op.t_val == 0:
