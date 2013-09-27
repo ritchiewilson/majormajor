@@ -53,7 +53,7 @@ class TestDocumentDependencyTreeToList:
         assert doc.get_dependencies() == [cs2]
         assert doc.get_ordered_changesets() == doc.tree_to_list()
 
-        
+
 
     def test_multiple_dependencies(self):
         """
@@ -116,13 +116,13 @@ class TestDocumentDependencyTreeToList:
         doc.receive_changeset(A)
         assert doc.get_ordered_changesets() == [root, A]
         assert doc.get_ordered_changesets() == doc.tree_to_list()
-        
+
         B = Changeset(doc.get_id(), "user1", [A])
         B.set_id('b')
         doc.receive_changeset(B)
         assert doc.get_ordered_changesets() == [root, A, B]
         assert doc.get_ordered_changesets() == doc.tree_to_list()
-        
+
         C = Changeset(doc.get_id(), "user3", [B])
         C.set_id('c')
         doc.receive_changeset(C)
@@ -158,7 +158,7 @@ class TestDocumentDependencyTreeToList:
     def test_complex_tree(self):
         """
         Some complex tree.
-        
+
                C -- G -- H -------- K
               /         /            \
         A -- B -- D -- F -- J -- L -- M--
@@ -166,9 +166,9 @@ class TestDocumentDependencyTreeToList:
                     E --- I
 
         Should be:
-        A B C G H K D E I J L M
+        A B C G D E I F H K J L M
         """
-        
+
         doc = Document(snapshot='')
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
@@ -177,13 +177,13 @@ class TestDocumentDependencyTreeToList:
         doc.receive_changeset(A)
         assert doc.get_ordered_changesets() == [root, A]
         assert doc.get_ordered_changesets() == doc.tree_to_list()
-        
+
         B = Changeset(doc.get_id(),"user1",[A])
         B.set_id('b')
         doc.receive_changeset(B)
         assert doc.get_ordered_changesets() == [root,A,B]
         assert doc.get_ordered_changesets() == doc.tree_to_list()
-        
+
         C = Changeset(doc.get_id(),"user3",[B])
         C.set_id('c')
         doc.receive_changeset(C)
@@ -258,7 +258,7 @@ class TestDocumentDependencyTreeToList:
         """
         # NOTE: Testing large numbers of changesets is slow, so dropping
         # the number for normal testing.
-        
+
         # NUMBER_OF_CHANGESETS = 5000
         NUMBER_OF_CHANGESETS = 200
 
@@ -280,7 +280,7 @@ def add_random_changeset(doc):
     Create a changeset with random, valid dependencies. Then insert
     them into the doc and return it.
     """
-    
+
     deps = []
     if random.random() > .2:
         """
@@ -307,12 +307,12 @@ def add_random_changeset(doc):
             if insert:
                 deps.append(new_dep)
             x = random.random()
-            
+
     # Need to increment user names here, otherwise lots of CSs with same hashcode
     user = str(NAME_INDEX)
     global NAME_INDEX
     NAME_INDEX += 1
-    
+
     cs = Changeset(doc.get_id(), user, deps)
     #doc.add_to_known_changesets(cs)
     #doc.insert_changeset_into_ordered_list(cs)
