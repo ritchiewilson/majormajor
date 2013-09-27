@@ -191,8 +191,8 @@ class Op(object):
         h = hazard
         if not (cs is h.conflict_cs or cs.has_ancestor(h.conflict_cs)):
             return False
-        if h.is_double_delete_hazard():
-            dd_cs = h.double_delete_op.get_changeset()
+        if h.is_interbranch_hazard():
+            dd_cs = h.interbranch_op.get_changeset()
             if not (cs is dd_cs or cs.has_ancestor(dd_cs)):
                 return False
         return True
@@ -209,15 +209,14 @@ class Op(object):
             raise Exception(s)
         self.deletion_edges.append((op, at_head))
 
-    def add_double_delete_hazard(self, hazard):
+    def add_interbranch_hazard(self, hazard):
         op = hazard.get_conflict_op()
         i = 0
-        found_op = False
-        while i < len(self.hazards):
-            if self.hazards[i].get_conflict_op() == op:
-                self.hazards.insert(i + 1, hazard)
+        for i, h in enumerate(reversed(self.hazards)):
+            if h.get_conflict_op() == op:
+                index = len(self.hazards) - i
+                self.hazards.insert(index, hazard)
                 break
-            i += 1
 
     def get_val_shifting_ops(self):
         return self.val_shifting_ops[:]
@@ -500,7 +499,7 @@ class Op(object):
             # their overlaps.
             size = min(overlap, self_val_shift, val_shift)
             ddh = Hazard(shift_op, op, self, val_shift=size)
-            shift_op.add_double_delete_hazard(ddh)
+            shift_op.add_interbranch_hazard(ddh)
 
     def transform_delete_by_previous_delete(self, op,
                                             past_t_offset, past_t_val):
@@ -655,7 +654,7 @@ class Op(object):
                 overlapping_op = self.val_shifting_ops[0][0]
                 s = len(self.val) * -1
                 ddh = Hazard(overlapping_op, op, self, val_shift=s)
-                overlapping_op.add_double_delete_hazard(ddh)
+                overlapping_op.add_interbranch_hazard(ddh)
 
         def delete_self(s):
             offset = s.t_offset - past_t_offset
@@ -743,7 +742,7 @@ class Op(object):
                 overlapping_op = op.get_val_shifting_ops()[0][0]
                 s = len(op.get_val()) * -1
                 ddh = Hazard(overlapping_op, self, op, val_shift=s)
-                overlapping_op.add_double_delete_hazard(ddh)
+                overlapping_op.add_interbranch_hazard(ddh)
 
         # if insertion was in this deletion range, expand the range to delete
         # that text as well.

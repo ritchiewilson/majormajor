@@ -312,7 +312,7 @@ class Changeset:
             if not cs.has_ancestor(pcs):
                 for op in pcs.get_ops():
                     h = Hazard(op, conflict_op, self_op, offset_shift=vs)
-                    op.add_double_delete_hazard(h)
+                    op.add_interbranch_hazard(h)
 
     def ot(self):
         """
