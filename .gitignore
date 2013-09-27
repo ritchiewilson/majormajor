@@ -1,3 +1,4 @@
+/tests/ot/test_scratch.py
 scripts/stats.profile
 scripts/ptexteditor.py
 scripts/read_profile.py
