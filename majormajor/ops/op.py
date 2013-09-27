@@ -212,11 +212,12 @@ class Op(object):
     def add_double_delete_hazard(self, hazard):
         op = hazard.get_conflict_op()
         i = 0
+        found_op = False
         while i < len(self.hazards):
             if self.hazards[i].get_conflict_op() == op:
+                self.hazards.insert(i + 1, hazard)
                 break
             i += 1
-        self.hazards.insert(i + 1, hazard)
 
     def get_val_shifting_ops(self):
         return self.val_shifting_ops[:]
@@ -664,6 +665,9 @@ class Op(object):
             s.noop = True
             s.add_val_shifting_op(op, offset)
             h = Hazard(op, s, val_shift=vs)
+            if self.changeset:
+                self.changeset.alert_preceding_changesets_of_deletion(op,
+                                                                      self, vs)
             return h
 
         # If this insertion is exactly at the edge of the past delete, see if

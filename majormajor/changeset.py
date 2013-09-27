@@ -19,6 +19,9 @@ import json
 import random
 from collections import deque
 
+from .hazards.hazard import Hazard
+
+
 class Changeset:
     def __init__(self, doc_id, user, dependencies):
         self.doc_id = doc_id
@@ -294,6 +297,22 @@ class Changeset:
                 self.preceding_changesets.insert(insertion_point, cs)
                 break
             i += 1
+
+    def alert_preceding_changesets_of_deletion(self, conflict_op, self_op,
+                                               val_shift):
+        """
+        When an insert op in this changeset (self_op) gets deleted (by
+        conflict_op), this must create a new Hazard and send it to every other
+        preceding op. This incase the preceding op is making adjustments
+        expecting self_op to still insert something.
+        """
+        cs = conflict_op.get_changeset()
+        vs = val_shift * -1
+        for pcs in self.preceding_changesets:
+            if not cs.has_ancestor(pcs):
+                for op in pcs.get_ops():
+                    h = Hazard(op, conflict_op, self_op, offset_shift=vs)
+                    op.add_double_delete_hazard(h)
 
     def ot(self):
         """
