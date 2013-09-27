@@ -28,25 +28,13 @@ read.
 """
 
 from majormajor.document import Document
-from majormajor.ops.op import Op
-from majormajor.changeset import Changeset
+
+from tests.test_utils import build_changesets_from_tuples
 
 
 class HazardForPastInsertWhenFutureInsertIsDeleted:
 
-    def build_changesets_from_tuples(self, css_data, doc):
-        css = []
-        for cs_data in css_data:
-            action, offset, val, deps, _id = cs_data
-            deps = [doc.get_root_changeset() if dep == 'root' else dep
-                    for dep in deps]
-            cs = Changeset(doc.get_id(), 'u1', deps)
-            cs.add_op(Op(action, [], offset=offset, val=val))
-            cs.set_id(_id)
-            css.append(cs)
-        return css
-
-    def test_insert_gets_deleted_document(self):
+    def test_hazard_for_insert_when_future_insert_is_deleted(self):
         doc = Document(snapshot='05IiYTALOC')
         doc.HAS_EVENT_LOOP = False
 
@@ -85,7 +73,7 @@ class HazardForPastInsertWhenFutureInsertIsDeleted:
 
         ]
 
-        self.css = self.build_changesets_from_tuples(css_data, doc)
+        self.css = build_changesets_from_tuples(css_data, doc)
         get_cs = self.get_cs
 
         doc.receive_changeset(self.css[0])

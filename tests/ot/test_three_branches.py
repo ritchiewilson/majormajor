@@ -18,35 +18,8 @@
 import pytest
 
 from majormajor.document import Document
-from majormajor.ops.op import Op
-from majormajor.changeset import Changeset
 
-
-def add_switches(params, n):
-    switches = [(i, n) for i in xrange(pow(2,n))]
-    bool_switches = [parse_switches(s) for s in switches]
-    params = [p + s for p in params for s in bool_switches]
-    return params
-
-
-
-def parse_switches(switches):
-    n, total = switches
-    bn = str(bin(n))[2:]
-    bn = ('0' * (total - len(bn))) + bn
-    return [True if x == '0' else False for x in bn]
-
-def build_changesets_from_tuples(css_data, doc):
-    css = []
-    for cs_data in css_data:
-        action, offset, val, deps, _id = cs_data
-        deps = [doc.get_root_changeset() if dep == 'root' else dep
-                for dep in deps]
-        cs = Changeset(doc.get_id(), 'u1', deps)
-        cs.add_op(Op(action, [], offset=offset, val=val))
-        cs.set_id(_id)
-        css.append(cs)
-    return css
+from tests.test_utils import add_switches, build_changesets_from_tuples
 
 
 insertion_results = [0, 1, 2, 3, 4, 5]
