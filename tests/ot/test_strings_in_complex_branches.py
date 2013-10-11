@@ -24,12 +24,15 @@ import pytest
 
 class TestStringsInComplexBranches:
     def get_printable_ascii(self):
+        import string
+        return string.letters + string.digits
         y = [unichr(i) for i in xrange(33, 200)]
         return u''.join(y)
 
     def build_random_initial_document(self):
         snapshot = ''.join(random.sample(self.remaining_chars, 10))
         doc = Document(snapshot=snapshot)
+        doc.get_ordered_changesets()[0].ops[0].cheat = ""
         for i, char in enumerate(snapshot):
             before = list(snapshot[:i])
             after = list(snapshot[i + 1:])
@@ -125,6 +128,7 @@ class TestStringsInComplexBranches:
             self.remaining_chars = self.remaining_chars.replace(char, '')
 
         op = Op('si', [], offset=offset, val=val)
+        op.cheat = previous_chars + " " + val + " " + subsequent_chars
         return op
 
     def build_random_string_delete(self):
@@ -149,10 +153,11 @@ class TestStringsInComplexBranches:
         for char in deleted_chars:
             self.results[char]['deleted'] = True
         op = Op('sd', [], offset=offset, val=val)
+        op.cheat = "delete " + deleted_chars
         return op
 
-    @pytest.mark.parametrize(('i'), [(i) for i in xrange(7)])
-    def test_full_runs(self, i):
+    @pytest.mark.parametrize(('i'), [(i) for i in xrange(500)])
+    def Xtest_full_runs(self, i):
         self.user_vector = 0  # ocasionally running into hash
                               # collisions. Change the username to avoid this.
         self.full_run()
@@ -162,11 +167,32 @@ class TestStringsInComplexBranches:
         self.build_random_initial_document()
         while self.remaining_chars:
             self.build_branch()
-        self.verify_results()
+            self.verify_results()
 
     def verify_results(self):
+        # need to chekc a lot of indexes, so cache them in a dict
+        snap_dict = {}
+        for i, c in enumerate(self.doc.get_snapshot()):
+            snap_dict[c] = i
+        for k, v in self.results.items():
+            if v['deleted']:
+                if k in snap_dict: self.dump_doc()
+                assert not k in snap_dict
+                continue
+            if not k in snap_dict:
+                continue
+            for c in v['before']:
+                if c in snap_dict:
+                    if snap_dict[c] > snap_dict[k]: self.dump_doc()
+                    assert snap_dict[c] < snap_dict[k]
+            for c in v['after']:
+                if c in snap_dict:
+                    if snap_dict[c] < snap_dict[k]: self.dump_doc()
+                    assert snap_dict[c] > snap_dict[k]
+
+    def dump_doc(self):
         with open('file.dot', 'w') as f:
-            f.write(self.doc.get_tree_dotfile(show_ops=False))
+            f.write(self.doc.get_tree_dotfile(show_ops=True))
         with open('cs_data.txt', 'w') as f:
             for cs in self.doc.get_ordered_changesets():
                 op = cs.get_ops()[0]
@@ -174,7 +200,9 @@ class TestStringsInComplexBranches:
                      [c.get_short_id() for c in cs.get_parents()],
                      cs.get_short_id())
                 f.write(str(t))
-                f.write(',\n')
+                f.write(',  # ')
+                f.write(op.cheat)
+                f.write('\n')
             f.write('\n\n')
             f.write(str(self.results))
             f.write('\n\n')
@@ -183,19 +211,3 @@ class TestStringsInComplexBranches:
                 f.write('\n')
                 f.write(str([c.get_short_id() for c in cs.get_children()]))
                 f.write('\n')
-        # need to chekc a lot of indexes, so cache them in a dict
-        snap_dict = {}
-        for i, c in enumerate(self.doc.get_snapshot()):
-            snap_dict[c] = i
-        for k, v in self.results.items():
-            if v['deleted']:
-                assert not k in snap_dict
-                continue
-            if not k in snap_dict:
-                continue
-            for c in v['before']:
-                if c in snap_dict:
-                    assert snap_dict[c] < snap_dict[k]
-            for c in v['after']:
-                if c in snap_dict:
-                    assert snap_dict[c] > snap_dict[k]
