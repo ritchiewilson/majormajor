@@ -455,16 +455,18 @@ class Op(object):
         r = self.object_transformation(past_t_path, past_t_offset, past_t_val)
         return r
 
-    def flag_interbranch_overlapping_deletes(self, op):
-        """Check if deletes from three branches are trying to delete some of the same
-        characters or array elements. First, get what each of these delete
-        ranges should have looked like. Then see if they overlap. If they
-        overlap, and any of the same delete ranges deleted both shift and op,
-        then three deletes are trying to get the same data.
-
+    def get_size_of_original_delete_overlap(self, op):
+        """
+        Figure out the original overlap size of the delete ranges of self and
+        op. This essentially means how much they would have overlapped if self
+        and op were the only final dependencies of the doc, and have not been
+        transformed by any branch unknown to either.This is needed to determine
+        if a hazard must be added previous unaccounted ops common to both.
         """
         # first get the two deletes intended ranges, and find their overlap
         cs = self.get_changeset()
+        if not cs:
+            return 0
         past_start, past_stop = op.get_extended_delete_range(cs, past_del=True)
         self_start, self_stop = \
             self.get_extended_delete_range(op.get_changeset(), past_del=False)
@@ -479,9 +481,17 @@ class Op(object):
                 overlap = self_stop - past_start
             else:
                 overlap = past_stop - past_start
-        if overlap == 0:
-            return
+        return overlap
 
+    def flag_tripple_overlapping_deletes(self, op, overlap):
+        """
+        Check if deletes from three branches are trying to delete some of the
+        same characters or array elements. First, get what each of these delete
+        ranges should have looked like. Then see if they overlap. If they
+        overlap, and any of the same delete ranges deleted both shift and op,
+        then three deletes are trying to get the same data.
+
+        """
         # if any of the same ops deleted them both, then there is some
         # interbranch overlap.
         ops_that_val_shifted_self = set([vso[0] for vso in
@@ -500,6 +510,20 @@ class Op(object):
             size = min(overlap, self_val_shift, val_shift)
             ddh = Hazard(shift_op, op, self, val_shift=size)
             shift_op.add_interbranch_hazard(ddh)
+
+    def add_double_delete_hazard_to_common_prev_ops(self, op, overlap):
+        """
+        When self and op should have been overlapping deletes, add a hazard to
+        all their common previous unaccounted ops.
+        """
+        cs = self.changeset
+        self_ucs = set(cs.get_unaccounted_changesets())
+        op_ucs = set(op.get_changeset().get_unaccounted_changesets())
+        common_css = self_ucs.intersection(op_ucs)
+        for prev_cs in common_css:
+            for prev_op in prev_cs.get_ops():
+                h = Hazard(prev_op, op, self, offset_shift=overlap)
+                prev_op.add_interbranch_hazard(h)
 
     def transform_delete_by_previous_delete(self, op,
                                             past_t_offset, past_t_val):
@@ -520,7 +544,11 @@ class Op(object):
         :rtype: Hazard or False
         """
         # first check if these deletes would have overlapped if not shortend
-        self.flag_interbranch_overlapping_deletes(op)
+        original_overlap  = self.get_size_of_original_delete_overlap(op)
+        if original_overlap != 0:
+            self.flag_tripple_overlapping_deletes(op, original_overlap)
+            self.add_double_delete_hazard_to_common_prev_ops(op,
+                                                             original_overlap)
 
         hazard = False
 
