@@ -27,7 +27,7 @@ from majormajor.document import Document
 from tests.test_utils import build_changesets_from_tuples
 
 
-class HazardForPastInsertWithFutureOverlappingDeletes:
+class TestHazardForPastInsertWithFutureOverlappingDeletes:
 
     def test_hazard_for_insert_with_future_overlapping_deletes(self):
         doc = Document(snapshot='WfjxUPBNyE')

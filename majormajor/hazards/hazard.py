@@ -51,6 +51,15 @@ class Hazard:
     def get_conflict_op(self):
         return self.conflict_op
 
+    def get_interbranch_op(self):
+        return self.interbranch_op
+
+    def get_interbranch_conflict_ops(self):
+        if self._is_interbranch_hazard:
+            return [self.interbranch_op, self.conflict_op]
+        else:
+            return [self.conflict_op]
+
     def get_base_op_index(self):
         return self.conflict_op_index
 

@@ -210,10 +210,10 @@ class Op(object):
         self.deletion_edges.append((op, at_head))
 
     def add_interbranch_hazard(self, hazard):
-        op = hazard.get_conflict_op()
+        conflict_ops = hazard.get_interbranch_conflict_ops()
         i = 0
         for i, h in enumerate(reversed(self.hazards)):
-            if h.get_conflict_op() == op:
+            if h.get_conflict_op() in conflict_ops:
                 index = len(self.hazards) - i
                 self.hazards.insert(index, hazard)
                 break
@@ -483,17 +483,15 @@ class Op(object):
                 overlap = past_stop - past_start
         return overlap
 
-    def flag_tripple_overlapping_deletes(self, op, overlap):
+    def add_double_delete_hazard_to_common_prev_ops(self, op, overlap):
         """
-        Check if deletes from three branches are trying to delete some of the
-        same characters or array elements. First, get what each of these delete
-        ranges should have looked like. Then see if they overlap. If they
-        overlap, and any of the same delete ranges deleted both shift and op,
-        then three deletes are trying to get the same data.
-
+        When self and op should have been overlapping deletes, add a hazard to
+        all their common previous unaccounted ops.
         """
-        # if any of the same ops deleted them both, then there is some
-        # interbranch overlap.
+        # Find any previous ops which partially deleted (val shifted) both of
+        # these ops. if any of the same ops deleted them both, then there is
+        # some interbranch overlap which requires a hazard
+        needed_val_shifts = set([])
         ops_that_val_shifted_self = set([vso[0] for vso in
                                         self.val_shifting_ops])
         for shift_op, offset_shift, val_shift in op.get_val_shifting_ops():
@@ -510,18 +508,18 @@ class Op(object):
             size = min(overlap, self_val_shift, val_shift)
             ddh = Hazard(shift_op, op, self, val_shift=size)
             shift_op.add_interbranch_hazard(ddh)
+            needed_val_shifts.update([shift_op])
 
-    def add_double_delete_hazard_to_common_prev_ops(self, op, overlap):
-        """
-        When self and op should have been overlapping deletes, add a hazard to
-        all their common previous unaccounted ops.
-        """
+        # now that all those triple overlapping deletes are accounted for, add
+        # hazards to every other past operation not known to these two ops.
         cs = self.changeset
         self_ucs = set(cs.get_unaccounted_changesets())
         op_ucs = set(op.get_changeset().get_unaccounted_changesets())
         common_css = self_ucs.intersection(op_ucs)
         for prev_cs in common_css:
             for prev_op in prev_cs.get_ops():
+                if prev_op in needed_val_shifts:
+                    continue
                 h = Hazard(prev_op, op, self, offset_shift=overlap)
                 prev_op.add_interbranch_hazard(h)
 
@@ -546,7 +544,6 @@ class Op(object):
         # first check if these deletes would have overlapped if not shortend
         original_overlap  = self.get_size_of_original_delete_overlap(op)
         if original_overlap != 0:
-            self.flag_tripple_overlapping_deletes(op, original_overlap)
             self.add_double_delete_hazard_to_common_prev_ops(op,
                                                              original_overlap)
 
@@ -772,26 +769,29 @@ class Op(object):
                 ddh = Hazard(overlapping_op, self, op, val_shift=s)
                 overlapping_op.add_interbranch_hazard(ddh)
 
+        def expand_deletion_range(s):
+            """Local helper called in several conds. Returns needed hazard"""
+            s.t_val += len(past_t_val)
+            s.add_val_shifting_op(op, 0, -1 * len(past_t_val))
+            return Hazard(op, s, noop_shift=True)
+
         # if insertion was in this deletion range, expand the range to delete
         # that text as well.
         if in_deletion_range:
-            self.t_val += len(past_t_val)
-            hazard = Hazard(op, self, noop_shift=True)
+            hazard = expand_deletion_range(self)
         # if insertion is exactly at start of deletion range, check if this is
         # part of an interbranch delete range. If so, delete. Otherwise shift
         # like normal.
         elif self.t_offset == past_t_offset:
             op.add_deletion_edge(self, head=True)
             if op.is_in_interbranch_deletion_range(self):
-                self.t_val += len(past_t_val)
-                hazard = Hazard(op, self, noop_shift=True)
+                hazard = expand_deletion_range(self)
             else:
                 self.t_offset += len(past_t_val)
         elif self.t_offset + self.t_val == past_t_offset:
             op.add_deletion_edge(self, tail=True)
             if op.is_in_interbranch_deletion_range(self):
-                self.t_val += len(past_t_val)
-                hazard = Hazard(op, self, noop_shift=True)
+                hazard = expand_deletion_range(self)
             else:
                 shift = self.t_val * -1
                 hazard = Hazard(op, self, offset_shift=shift)
