@@ -100,10 +100,11 @@ class TextViewWindow(Gtk.Window):
         s.document.add_local_op(op)
 
     def receive_changeset(self, opcodes):
-        h_ids = self.majormajor_handlers
-        with self.textbuffer.handler_block(h_ids['insert-text']):
-            with self.textbuffer.handler_block(h_ids['delete-range']):
-                self.apply_opcodes(opcodes)
+        try:
+            self.block_handlers()
+            self.apply_opcodes(opcodes)
+        finally:
+            self.unblock_handlers()
 
     def apply_opcodes(self, opcodes):
         index = 0
@@ -154,10 +155,21 @@ class TextViewWindow(Gtk.Window):
         return True
 
     def receive_snapshot(self, snapshot):
+        try:
+            self.block_handlers()
+            self.textbuffer.set_text(snapshot)
+        finally:
+            self.unblock_handlers()
+
+    def block_handlers(self):
         h_ids = self.majormajor_handlers
-        with self.textbuffer.handler_block(h_ids['insert-text']):
-            with self.textbuffer.handler_block(h_ids['delete-range']):
-                self.textbuffer.set_text(snapshot)
+        self.textbuffer.handler_block(h_ids['insert-text'])
+        self.textbuffer.handler_block(h_ids['delete-range'])
+
+    def unblock_handlers(self):
+        h_ids = self.majormajor_handlers
+        self.textbuffer.handler_unblock(h_ids['insert-text'])
+        self.textbuffer.handler_unblock(h_ids['delete-range'])
 
     def create_toolbar(self):
         toolbar = Gtk.Toolbar()
