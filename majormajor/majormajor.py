@@ -180,13 +180,11 @@ class MajorMajor:
         back off.
         """
         msg = {}
-        for doc_id, css in self.requested_changesets.items():
-            doc = self.get_document_by_id(doc_id)
-            if not doc: continue
+        for doc, css in self.requested_changesets.items():
             missing_changesets = doc.get_missing_changeset_ids()
             request_list = []
-            doc_dict = self.requested_changesets[doc_id]
-            for cs_id, count in css.items():
+            doc_dict = self.requested_changesets[doc]
+            for cs_id, count in list(css.items()):
                 if not cs_id in missing_changesets:
                     del doc_dict[cs_id]
                 elif count['countdown'] == 0:
