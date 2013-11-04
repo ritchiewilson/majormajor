@@ -40,6 +40,9 @@ class Hazard:
 
         self.base_cs = base_op.get_changeset()
         self.conflict_cs = conflict_op.get_changeset()
+        self.interbranch_cs = None
+        if interbranch_op:
+            self.interbranch_cs = interbranch_op.get_changeset()
 
         self._is_path_hazard = not path_shift is None
         self._is_offset_hazard = not offset_shift is None
@@ -92,3 +95,17 @@ class Hazard:
 
     def is_interbranch_hazard(self):
         return self._is_interbranch_hazard
+
+    def __str__(self):
+        s = "<Hazard base_cs: "
+        s += self.base_cs.get_id()
+        s += ", conflict_cs: "
+        s += self.conflict_cs.get_id()
+        s += ", interbrach_cs: "
+        s += self.interbranch_cs.get_id() if self.interbranch_cs else "None"
+        s += ", val_shift: "
+        s += str(self.get_val_shift())
+        s += ", offset_shift: "
+        s += str(self.get_offset_shift())
+        s += " >"
+        return s
