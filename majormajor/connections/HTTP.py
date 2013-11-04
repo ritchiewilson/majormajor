@@ -15,12 +15,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-from SocketServer import ThreadingMixIn
+import urllib
+
+try:
+    from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+    from SocketServer import ThreadingMixIn
+except:
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from socketserver import ThreadingMixIn
+    import urllib.request
 import threading
 import cgi
 import json
-import urllib
 
 from gi.repository import GObject
 
@@ -32,16 +38,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(s):
         postvars = {}
-        ctype, pdict = cgi.parse_header(s.headers.getheader('content-type'))
+        ctype, pdict = cgi.parse_header(s.headers['Content-Type'])
         if ctype == 'multipart/form-data':
             postvars = cgi.parse_multipart(s.rfile, pdict)
         elif ctype == 'application/x-www-form-urlencoded':
-            length = int(s.headers.getheader('content-length'))
+            length = int(s.headers['Content-Length'])
             postvars = cgi.parse_qs(s.rfile.read(length), keep_blank_values=1)
         s.send_response(200)
         s.send_header("Content-type", "text/plain")
         s.end_headers()
-        s.wfile.write("ack")
+        s.wfile.write("ack".encode('utf-8'))
         GObject.idle_add(s.server._listen_callback, postvars)
 
     def do_GET(s):
@@ -49,9 +55,10 @@ class Handler(BaseHTTPRequestHandler):
         s.send_response(200)
         s.send_header("Content-type", "text/html")
         s.end_headers()
-        s.wfile.write("<html><head><title>MajorMajor</title></head>")
-        s.wfile.write("<body><h2>MajorMajor</h2>")
-        s.wfile.write("</body></html>")
+        body = "<html><head><title>MajorMajor</title></head>" +\
+               "<body><h2>MajorMajor</h2>" +\
+               "</body></html>"
+        s.wfile.write(body.encode('utf-8'))
 
     def log_message(self, *args):
         """Turn off messages on each request"""
@@ -117,17 +124,32 @@ class HTTPConnection(Connection):
 
         for port in ports:
             url = "http://127.0.1.1:" + str(port)
-            data = urllib.urlencode({'payload': msg.to_json()})
+            data = self.urlencode_wrapper(msg).encode('utf-8')
             try:
-                urllib.urlopen(url, data=data)
-            except:
+                self.urlopen_wrapper(url, data)
+            except Exception as e:
                 print("Could not connect to", url)
-                pass
+
+    def urlencode_wrapper(self, msg):
+        try:
+            return urllib.urlencode({'payload': msg.to_json()})
+        except:
+            return urllib.parse.urlencode({'payload': msg.to_json()})
+
+    def urlopen_wrapper(self, url, data):
+        try:
+            urllib.urlopen(url, data=data)
+        except:
+            urllib.request.urlopen(url, data=data)
 
     def _listen_callback(self, payload):
 
         """
         """
-        m = json.loads(payload['payload'][0])
+
+        p = payload['payload'][0] if 'payload' in payload else \
+            payload[b'payload'][0].decode('utf-8')
+
+        m = json.loads(p)
         msg = Message(msg=m)
         self.on_receive_callback(msg)
