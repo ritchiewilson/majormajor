@@ -128,7 +128,7 @@ class MajorMajor:
         :param doc_id: Id of desired document
         :type doc_id: uuid
         """
-        if isinstance(doc_id, str) or isinstance(doc_id, unicode):
+        if not isinstance(doc_id, uuid.UUID):
             doc_id = uuid.UUID(doc_id)
         for doc in self.documents:
             if doc.get_id() == doc_id:

@@ -32,7 +32,8 @@ class Op(object):
                     'od': ObjectDeleteOp,
                     'set': SetOp }.get(args[0], cls)
 
-        new_instance = object.__new__(subclass, *args, **kwargs)
+        new_instance = object.__new__(subclass)
+        new_instance.__init__(*args, **kwargs)
         return new_instance
 
     def __init__(self, action, path, val=None, offset=None,
@@ -859,6 +860,8 @@ class Op(object):
 
 class SetOp(Op):
     pass
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(args, kwargs)
 
 from .string_insert_op import StringInsertOp
 from .string_delete_op import StringDeleteOp
