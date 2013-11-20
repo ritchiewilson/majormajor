@@ -28,7 +28,6 @@ from majormajor.majormajor import MajorMajor
 from majormajor.ops.op import Op
 
 
-
 class TextViewWindow(Gtk.Window):
 
     def __init__(self):
@@ -44,6 +43,9 @@ class TextViewWindow(Gtk.Window):
         self.create_buttons()
 
         self.glue_majormajor()
+        #box = self.majormajor.get_contact_list_gui()
+        #self.grid.attach(box, 4, 1, 1, 2)
+
 
     def glue_majormajor(self):
 
@@ -59,6 +61,7 @@ class TextViewWindow(Gtk.Window):
         self.majormajor.connect('receive-snapshot', self.receive_snapshot)
         self.majormajor.connect('accept-invitation', self.accept_invitation)
         self.random_insert = False
+        self.uncommitted_ops = []
         GObject.timeout_add(20, self.test_random_insert)
 
     def open_default_connection(self, listen_port):

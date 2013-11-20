@@ -306,6 +306,8 @@ class Changeset:
         preceding op. This incase the preceding op is making adjustments
         expecting self_op to still insert something.
         """
+        if not self.preceding_changesets:
+            return
         cs = conflict_op.get_changeset()
         vs = val_shift * -1
         for pcs in self.preceding_changesets:

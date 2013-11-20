@@ -465,6 +465,7 @@ class MajorMajor:
         self.send_changesets(doc=doc, css=css)
 
     def send_changesets(self, doc=None, css=None):
+        if self.drop_random_css: return
         msg = Message('send_changesets', self.default_user,
                       doc=doc, send_css=css)
         users = self.remote_users.values()
@@ -542,9 +543,26 @@ class MajorMajor:
     def add_user(self, user):
         if not user.get_id() in self.remote_users:
             self.remote_users[user.get_id()] = user
+            #self.add_all_users_to_liststore()
 
     def knows_user(self, user_id):
         return user_id in self.remote_users
+
+    def get_contact_list_gui(self):
+        from gi.repository import Gtk
+        builder = Gtk.Builder()
+        builder.add_from_file('../majormajor/ui/contact_list.glade')
+        box = builder.get_object('container')
+        self.liststore = builder.get_object('collaborator_list_store')
+        self.add_all_users_to_liststore()
+        return box
+
+    def add_all_users_to_liststore(self):
+        self.liststore.clear()
+        for user_id, user in self.remote_users.items():
+            conn = user.get_properties_for_connection('http')
+            addr = "127.0.1.1:" + str(conn['port'])
+            self.liststore.append([addr, 'active'])
 
     signal_callbacks = {
         'receive-changeset' : [],
