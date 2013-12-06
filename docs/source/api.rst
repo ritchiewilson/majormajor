@@ -1,5 +1,5 @@
-Documentation for Code
-======================
+API
+===
 
 .. module:: majormajor
 

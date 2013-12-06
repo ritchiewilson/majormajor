@@ -1,22 +1,14 @@
-.. Majormajor documentation master file, created by
-   sphinx-quickstart on Tue Aug 13 19:05:08 2013.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Welcome to MajorMajor
+=====================
 
-Welcome to Majormajor's documentation!
-======================================
+MajorMajor is a library to enable real-time, collaborative document editing in
+desktop applications.
 
-Contents:
+
+API Reference
+-------------
 
 .. toctree::
    :maxdepth: 2
 
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
+   api
