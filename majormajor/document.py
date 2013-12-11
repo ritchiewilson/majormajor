@@ -395,7 +395,7 @@ class Document:
             self.receive_changeset(cs)
         return True
 
-    def receive_changeset(self, cs):
+    def receive_changeset(self, cs, pull=True):
         """
         When a user is sent a new changeset from another editor, put
         it into place and rebuild state with that addition.
@@ -418,7 +418,8 @@ class Document:
         if self.HAS_EVENT_LOOP:
             return True
 
-        was_inserted = self.pull_from_pending_list()
+        was_inserted = self.pull_from_pending_list() if pull else \
+                                self.pull_from_pending_list(cs)
         return was_inserted
 
     def activate_changeset_in_document(self, cs):
@@ -447,7 +448,7 @@ class Document:
         self.dependencies.append(cs)
         return index
 
-    def pull_from_pending_list(self):
+    def pull_from_pending_list(self, cs=None):
         """
         Go through the list of pending changesets and try again to
         incorporatet them into this document. As long as the list of
@@ -457,6 +458,16 @@ class Document:
         # keep track of lowest index for start point for ot
         index = len(self.ordered_changesets)
         one_inserted = False
+
+        if cs:
+            if not self.has_needed_dependencies(cs):
+                return False
+            i = self.activate_changeset_in_document(cs)
+            self.pending_new_changesets.remove(cs)
+            self.ot(i)
+            self.rebuild_snapshot()
+            return True
+
         l = -1  # flag for when looping is done
         while not l == len(self.pending_new_changesets):
             l = len(self.pending_new_changesets)

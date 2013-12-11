@@ -374,7 +374,7 @@ class Changeset:
         return self.id_
 
     def get_short_id(self):
-        return self.get_id()[:3]
+        return self.get_id()[:7]
 
     def __str__(self):
         """
