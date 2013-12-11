@@ -9,20 +9,11 @@ server. Users just send messages to each other over whatever protocol
 they choose, and MajorMajor is responsible for keeping the group in
 sync.
 
-Quick Start
------------
-
-Checkout the code over ssh:
-`git clone git@majormajor.org:repos/majormajor.git`
-
-or over http:
-`git clone http://git.majormajor.org:/majormajor.git`
-
 
 Sample Text Editor
 ------------------
 
-Try the sample text editor in the scripts directory::
+Try the sample GTK text editor in the scripts directory::
 
     $ python texteditor.py
 
