@@ -151,7 +151,7 @@ class TestRandomStringsWithTwoUsers:
         return op
 
     @pytest.mark.parametrize(('i'), [(i) for i in xrange(1)])
-    def test_full_runs(self, i):
+    def Xtest_full_runs(self, i):
         self.user_vector = 0  # ocasionally running into hash
                               # collisions. Change the username to avoid this.
         self.full_run()
