@@ -1,4 +1,3 @@
-
 MajorMajor
 ==========
 
@@ -23,41 +22,24 @@ or over http:
 Sample Text Editor
 ------------------
 
-Try the sample text editor in the scripts directory:
-```
-$ python texteditor.py
-```
+Try the sample text editor in the scripts directory::
 
-Then in a separate terminal, open another instance of the text editor:
-```
-$ python texteditor.py
-```
+    $ python texteditor.py
 
-Open as many as you like.
+
+Then in a separate terminal, open another instance of the text editor. Open 
+as many as you like.
 
 In any texteditor window, the green checkmark button will invite the others
-to work on the same document and keep in sync.
+to work on the same document and keep in sync. The red "X" will take that
+editor offline. Bring it back online and watch the documents sync up.
 
 
 Tests
 -----
 
-The tests are done with pytest. From the project root, run `py.test`.
+The tests are done with pytest. From the project root, run ``py.test``.
 
-Goals vs. Status
-----------------
-
-MajorMajor minimally works, but is not nearly complete.
-
- - **Full JSON Support** -- MajorMajor currently only handles plain
-     text, but is designed to eventually handle any json document.
- - **Easy Integration** -- With some glue, MajorMajor should be easily
-     plugged into existing desktop programs. Currently it is hard
-     coded to work with some GObject based examples.
- - **Arbitrary Network Protocols** -- Messages between users are
-     currently UDP packets broadcast over a local network. However the
-     Connection module is extensible, and should handle anything
-     (http, IRC, XMPP, TorChat)
 
 License
 -------
@@ -70,5 +52,5 @@ Contact
 
 MajorMajor was created by Ritchie Wilson, wilson.ri@husky.neu.edu
 
-All info found at http://www.majormajor.org
+More info found at http://www.majormajor.org
 
