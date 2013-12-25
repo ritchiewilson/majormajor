@@ -14,21 +14,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.ops.op import Op
 
 
 class TestDocumentApplyOp:
     def setup_method(self, method):
-        self.doc0 = Document()
-        self.doc1 = Document()
+        self.doc0 = _Document()
+        self.doc1 = _Document()
         doc1_snap = {'first': 'some string',
                      'second': {'third': 'more string',
                                 'fourth': {'numb': 55}},
                      'fifth': [55, 66, {'sixth': 'deep string'}, 'rw']}
         self.doc1.snapshot.set_snapshot(doc1_snap)
         
-        self.doc2 = Document()
+        self.doc2 = _Document()
         doc2_snap = [{'name': 'value'},
                      [1, 2, 3, 4],
                      'normal, ol string',
@@ -38,7 +38,7 @@ class TestDocumentApplyOp:
                      42]
         self.doc2.snapshot.set_snapshot(doc2_snap)
 
-        self.doc3 = Document()
+        self.doc3 = _Document()
         self.doc3.snapshot.set_snapshot('ABCDEFG')
 
     def test_set_value(self):
@@ -79,7 +79,7 @@ class TestDocumentApplyOp:
         assert doc2.get_value([3,2,0]) == 5
 
     def test_boolean_negation(self):
-        doc0 = Document()
+        doc0 = _Document()
         doc0.snapshot.set_snapshot(False)
         doc1 = self.doc1
         doc2 = self.doc2
@@ -108,7 +108,7 @@ class TestDocumentApplyOp:
         assert doc1.get_value(path3) == True
 
     def test_number_add(self):
-        doc0 =  Document()
+        doc0 =  _Document()
         doc0.snapshot.set_snapshot(0)
         doc1 = self.doc1
         doc2 = self.doc2
@@ -178,7 +178,7 @@ class TestDocumentApplyOp:
         assert doc2.get_value([3,1,0]) == 'dim'
 
     def test_array_insert(self):
-        doc0 = Document()
+        doc0 = _Document()
         doc0.snapshot.set_snapshot([])
         doc1 = self.doc1
         doc2 = self.doc2
@@ -212,7 +212,7 @@ class TestDocumentApplyOp:
         assert doc1.get_value(['fifth']) == result6
 
     def test_array_delete(self):
-        doc0 =  Document()
+        doc0 =  _Document()
         doc0.snapshot.set_snapshot([])
         doc1 = self.doc1
         doc2 = self.doc2

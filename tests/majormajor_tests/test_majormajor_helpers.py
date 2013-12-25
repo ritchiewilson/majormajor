@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from majormajor.majormajor import MajorMajor
-from majormajor.document import Document
+from majormajor.document import _Document
 
 
 
@@ -27,6 +27,6 @@ class TestMajorMajorHelpers:
     def test_new_document(self):
         # leaving nothing specified
         doc = self.collab0.new_document()
-        assert isinstance(doc, Document)
+        assert isinstance(doc, _Document)
         assert doc.get_snapshot() == {}
 

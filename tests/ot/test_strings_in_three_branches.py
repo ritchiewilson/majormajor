@@ -16,7 +16,7 @@
 
 import random
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
@@ -24,7 +24,7 @@ from majormajor.changeset import Changeset
 class TestStringsInThreeBranches:
 
     def setup_method(self, method):
-        doc = Document(snapshot='0123456789')
+        doc = _Document(snapshot='0123456789')
         doc.HAS_EVENT_LOOP = False
         self.doc = doc
         self.create_changesets(doc)
@@ -138,7 +138,7 @@ class TestStringsInThreeBranches:
 
         iteration = 0
         while iteration < NUMBER_OF_ITERATIONS:
-            doc = Document(snapshot='0123456789')
+            doc = _Document(snapshot='0123456789')
             self.create_changesets(doc)
             css = [self.A1, self.A0,
                    self.B1, self.B0,

@@ -17,7 +17,7 @@
 
 import pytest
 
-from majormajor.document import Document
+from majormajor.document import _Document
 
 from tests.test_utils import add_switches, build_changesets_from_tuples
 
@@ -36,7 +36,7 @@ def test_insert_within_overlaping_deletes(insert_index, resulting_index,
                                           insert_first,
                                           low_index_in_0_branch):
 
-    doc = Document(snapshot='abcdefghijklmnopqrstuvwxyz')
+    doc = _Document(snapshot='abcdefghijklmnopqrstuvwxyz')
     doc.HAS_EVENT_LOOP = False
 
     first_delete_index = 10 if low_index_in_0_branch else 5
@@ -75,7 +75,7 @@ def test_insert_within_overlaping_deletes(insert_index, resulting_index,
 
 
 def test_insert_within_many_overlaping_deletes():
-    doc = Document(snapshot='abcdefghij')
+    doc = _Document(snapshot='abcdefghij')
     doc.HAS_EVENT_LOOP = False
     css_data = [
         ('si', 5, 'X', ['root'], 'A'),  # should result in abcdeXfghij
@@ -99,7 +99,7 @@ params += [(i, False) for i in range(26)]
 @pytest.mark.parametrize(('delete_index', 'single_first'), params)
 def test_overlaping_deletes(delete_index, single_first):
     original_snapshot = 'abcdefghijklmnopqrstuvwxyz'
-    doc = Document(snapshot=original_snapshot)
+    doc = _Document(snapshot=original_snapshot)
     doc.HAS_EVENT_LOOP = False
 
     z_index = 14

@@ -18,7 +18,7 @@
 Some expanded deletion ranges overlapping other deletion ranges
 """
 
-from majormajor.document import Document
+from majormajor.document import _Document
 
 from tests.test_utils import build_changesets_from_tuples
 
@@ -26,7 +26,7 @@ from tests.test_utils import build_changesets_from_tuples
 class TestExpandDeletionRange:
 
     def test_expand_deletion_range(self):
-        doc = Document(snapshot='HjpRFtZXW5')
+        doc = _Document(snapshot='HjpRFtZXW5')
         doc.HAS_EVENT_LOOP = False
 
         css_data = [

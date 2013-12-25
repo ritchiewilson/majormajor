@@ -19,7 +19,7 @@ Tests Array opperations, inserts and deletes, in two branches which then
 get synced together.
 """
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
@@ -34,7 +34,7 @@ class TestArraysInTwoBranches:
               'QRST',
               'UVWX',
               'YZ']
-        self.doc1 = Document(snapshot=s1)
+        self.doc1 = _Document(snapshot=s1)
         self.doc1.HAS_EVENT_LOOP = False
         self.root1 = self.doc1.get_root_changeset()
 

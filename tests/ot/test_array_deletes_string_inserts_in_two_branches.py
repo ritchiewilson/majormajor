@@ -19,7 +19,7 @@ Set up two branches to do array deletes and string insertions. Each branch
 1) inserts text, 2) deletes array elements, and 3) inserts strings
 """
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
@@ -34,7 +34,7 @@ class TestArrayDeletesAndStringInsertsInTwoBranches:
               'QRST',
               'UVWX',
               'YZ']
-        doc = Document(snapshot=s1)
+        doc = _Document(snapshot=s1)
         doc.HAS_EVENT_LOOP = False
         self.doc = doc
         self.root = self.doc.get_root_changeset()

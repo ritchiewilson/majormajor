@@ -14,14 +14,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
 class TestDocumentMissingChangesets:
 
     def test_missing_changesets(self):
-        doc = Document(snapshot='')
+        doc = _Document(snapshot='')
         doc.HAS_EVENT_LOOP = False
         assert doc.missing_changesets == set([])
         assert doc.pending_new_changesets == []

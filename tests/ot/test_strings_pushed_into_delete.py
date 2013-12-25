@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
@@ -44,7 +44,7 @@ class TestStringsPushedIntoDeleteRange:
     demonstrates how to avoid this if the B branch's inserts must be preserved.
     """
     def setup_method(self, method):
-        doc = Document(snapshot='0123')
+        doc = _Document(snapshot='0123')
         doc.HAS_EVENT_LOOP = False
         self.doc = doc
         root = doc.get_root_changeset()
@@ -119,7 +119,7 @@ class TestAvoidPushingStringsIntoDeleteRange:
     """
 
     def setup_method(self, method):
-        doc = Document(snapshot='0123')
+        doc = _Document(snapshot='0123')
         doc.HAS_EVENT_LOOP = False
         self.doc = doc
         root = doc.get_root_changeset()

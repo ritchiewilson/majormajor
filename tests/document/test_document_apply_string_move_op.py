@@ -14,21 +14,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.ops.op import Op
 
 
 class TestDocumentApplyStringMoveOp:
     def setup_method(self, method):
-        self.doc0 = Document()
-        self.doc1 = Document()
+        self.doc0 = _Document()
+        self.doc1 = _Document()
         doc1_snap = {'first': 'some string',
                      'second': {'third': 'more string',
                                 'fourth': {'numb': 55}},
                      'fifth': [55, 66, {'sixth': 'deep string'}, 'rw']}
         self.doc1.snapshot.set_snapshot(doc1_snap)
 
-        self.doc2 = Document()
+        self.doc2 = _Document()
         doc2_snap = [{'name': 'value'},
                      [1, 2, 3, 4],
                      'normal, ol string',
@@ -39,7 +39,7 @@ class TestDocumentApplyStringMoveOp:
         self.doc2.snapshot.set_snapshot(doc2_snap)
 
     def test_move_in_root(self):
-        doc = Document()
+        doc = _Document()
         doc.snapshot.set_snapshot('ABCDEFGHIJKLMNOPQRS')
 
         # move from higher index to lower

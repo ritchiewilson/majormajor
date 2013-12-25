@@ -16,7 +16,7 @@
 
 import pytest
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
@@ -26,7 +26,7 @@ class TestOTDelteInOneBranch:
     def test_delete_in_first_branch(self):
         """
         """
-        doc = Document(snapshot='abcdefghij')
+        doc = _Document(snapshot='abcdefghij')
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
@@ -50,7 +50,7 @@ class TestOTDelteInOneBranch:
     def test_delete_in_second_branch(self):
         """
         """
-        doc = Document(snapshot='abcdefghij')
+        doc = _Document(snapshot='abcdefghij')
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 

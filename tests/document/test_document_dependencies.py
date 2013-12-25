@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.changeset import Changeset
 import random
 
@@ -22,7 +22,7 @@ import random
 class TestDocumentDependencyTreeToList:
 
     def test_initial_dependency(self):
-        doc = Document(snapshot='')
+        doc = _Document(snapshot='')
         doc.HAS_EVENT_LOOP = False
         assert doc.get_open_changeset() == None
         assert doc.get_ordered_changesets() == [doc.get_root_changeset()]
@@ -30,7 +30,7 @@ class TestDocumentDependencyTreeToList:
         assert doc.get_dependencies() == [doc.get_root_changeset()]
 
     def test_sequential_changeset(self):
-        doc = Document(snapshot='')
+        doc = _Document(snapshot='')
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
         cs0 = Changeset(doc.get_id(), "dummyuser", [root])
@@ -63,7 +63,7 @@ class TestDocumentDependencyTreeToList:
             \       /
              -- C --
         """
-        doc = Document(snapshot='')
+        doc = _Document(snapshot='')
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
         B = Changeset(doc.get_id(), "user0", [root])
@@ -108,7 +108,7 @@ class TestDocumentDependencyTreeToList:
                 - C--E-
         Both F and E depend on D and C
         """
-        doc = Document(snapshot='')
+        doc = _Document(snapshot='')
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
         A = Changeset(doc.get_id(), "user0", [root])
@@ -169,7 +169,7 @@ class TestDocumentDependencyTreeToList:
         A B C G D E I F H K J L M
         """
 
-        doc = Document(snapshot='')
+        doc = _Document(snapshot='')
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
         A = Changeset(doc.get_id(), "user0", [root])
@@ -262,7 +262,7 @@ class TestDocumentDependencyTreeToList:
         # NUMBER_OF_CHANGESETS = 5000
         NUMBER_OF_CHANGESETS = 200
 
-        doc = Document(snapshot='')
+        doc = _Document(snapshot='')
         doc.HAS_EVENT_LOOP = False
         assert doc.get_ordered_changesets() == doc.tree_to_list()
         i = 1

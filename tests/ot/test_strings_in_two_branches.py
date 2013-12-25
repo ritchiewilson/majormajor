@@ -23,7 +23,7 @@ collaboratively. This means the tests are 1) not comprehensive, and 2) slightly
 convoluted.
 """
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
@@ -35,7 +35,7 @@ class TestStringsInTwoBranches:
         There is one delete in the first branch, multiple in branch B, then
         each has more string inserts.
         """
-        doc = Document(snapshot='123abcde789')
+        doc = _Document(snapshot='123abcde789')
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
@@ -91,7 +91,7 @@ class TestStringsInTwoBranches:
         Same opperations as previous test, but order of branches is reversed
         (B now before A)
         """
-        doc = Document(snapshot='123abcde789')
+        doc = _Document(snapshot='123abcde789')
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
@@ -138,7 +138,7 @@ class TestStringsInTwoBranches:
     def test_two_deletes_in_first_branch(self):
         """  01234567890123456 (helpful index of characters in doc)"""
         s = 'ab123cd456gh789ik'
-        doc = Document(snapshot=s)
+        doc = _Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
@@ -198,7 +198,7 @@ class TestStringsInTwoBranches:
         (B now before A)
         """
         s = 'ab123cd456gh789ik'
-        doc = Document(snapshot=s)
+        doc = _Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
@@ -257,7 +257,7 @@ class TestStringsInTwoBranches:
         perform other string operations that need to keep synced.
         """
         s = '0123456789'
-        doc = Document(snapshot=s)
+        doc = _Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
@@ -322,7 +322,7 @@ class TestStringsInTwoBranches:
         (B now before A)
         """
         s = '0123456789'
-        doc = Document(snapshot=s)
+        doc = _Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
@@ -384,7 +384,7 @@ class TestStringsInTwoBranches:
         perform other string operations that need to keep synced.
         """
         s = '0123456789TARGET'
-        doc = Document(snapshot=s)
+        doc = _Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
@@ -446,7 +446,7 @@ class TestStringsInTwoBranches:
         (B now before A)
         """
         s = '0123456789TARGET'
-        doc = Document(snapshot=s)
+        doc = _Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
@@ -512,7 +512,7 @@ class TestStringsInTwoBranches:
         at the time.
         """
         s = 'ZZZZZZZAAAAAAAAAAAAAAAAAAAAAAAAAXXXXX'
-        doc = Document(snapshot=s)
+        doc = _Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
@@ -570,7 +570,7 @@ class TestStringsInTwoBranches:
         reversed.
         """
         s = 'ZZZZZZZAAAAAAAAAAAAAAAAAAAAAAAAAXXXXX'
-        doc = Document(snapshot=s)
+        doc = _Document(snapshot=s)
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
@@ -629,7 +629,7 @@ class TestStringsInTwoBranches:
         Note: This test is fairly redundant. Just don't want to delete an old
         test.
         """
-        doc = Document(snapshot='')
+        doc = _Document(snapshot='')
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 
@@ -696,7 +696,7 @@ class TestStringsInTwoBranches:
         Note: This test is fairly redundant. Just don't want to delete an old
         test.
         """
-        doc = Document(snapshot='')
+        doc = _Document(snapshot='')
         doc.HAS_EVENT_LOOP = False
         root = doc.get_root_changeset()
 

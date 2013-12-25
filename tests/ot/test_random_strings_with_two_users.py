@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.changeset import Changeset
 from majormajor.ops.op import Op
 import random
@@ -33,7 +33,7 @@ class TestRandomStringsWithTwoUsers:
 
     def build_random_initial_document(self):
         snapshot = ''.join(random.sample(self.remaining_chars, 100))
-        doc = Document(snapshot=snapshot)
+        doc = _Document(snapshot=snapshot)
         doc.get_ordered_changesets()[0].ops[0].cheat = ""
         for i, char in enumerate(snapshot):
             before = list(snapshot[:i])

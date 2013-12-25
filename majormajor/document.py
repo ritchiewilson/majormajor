@@ -25,7 +25,7 @@ from .snapshot import Snapshot
 from .utils import build_changeset_from_dict
 
 
-class Document:
+class _Document:
 
     # Each document needs an ID so that changesets can be associated
     # with it. If one is not supplied, make a random 5 character ID at

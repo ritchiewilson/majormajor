@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
@@ -22,14 +22,14 @@ from majormajor.changeset import Changeset
 class TestDocumentHelpers:
 
     def setup_method(self, method):
-        self.doc0 = Document(snapshot={})
+        self.doc0 = _Document(snapshot={})
         self.doc0.HAS_EVENT_LOOP = False
 
         s1 = {'first': 'some string',
               'second': {'third':'more string',
                          'fourth':{'numb':55}},
               'fifth': [55,66,{'sixth': 'deep string'}, 'rw']}
-        self.doc1 = Document(snapshot=s1)
+        self.doc1 = _Document(snapshot=s1)
         self.doc1.HAS_EVENT_LOOP = False
         
         s2 = [{'name':'value'},
@@ -39,13 +39,13 @@ class TestDocumentHelpers:
               True,
               None,
               42]
-        self.doc2 = Document(snapshot=s2)
+        self.doc2 = _Document(snapshot=s2)
         self.doc2.HAS_EVENT_LOOP = False
-        self.doc3 = Document(snapshot = "ABCDEFG")
+        self.doc3 = _Document(snapshot = "ABCDEFG")
         self.doc3.HAS_EVENT_LOOP = False
         
     def test_get_id(self):
-        doc = Document('abc456')
+        doc = _Document('abc456')
         assert doc.get_id() == 'abc456'
         
     # Testing that Document can tell if a path is valid in its

@@ -20,7 +20,7 @@ parts of the text, 2) deletes elements from the array and 3) deletes more text
 from the remaining elements
 """
 
-from majormajor.document import Document
+from majormajor.document import _Document
 from majormajor.ops.op import Op
 from majormajor.changeset import Changeset
 
@@ -35,7 +35,7 @@ class TestArrayAndStringDeletesInTwoBranches:
               'QRST',
               'UVWX',
               'YZ']
-        doc = Document(snapshot=s1)
+        doc = _Document(snapshot=s1)
         doc.HAS_EVENT_LOOP = False
         self.doc = doc
         self.root = self.doc.get_root_changeset()

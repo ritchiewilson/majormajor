@@ -22,7 +22,7 @@ overlapping delete was working fine, but the overlapping delete in branches two
 and three needed to be accounted for in the ops before branch A deletes.
 """
 
-from majormajor.document import Document
+from majormajor.document import _Document
 
 from tests.test_utils import build_changesets_from_tuples
 
@@ -30,7 +30,7 @@ from tests.test_utils import build_changesets_from_tuples
 class TestHazardForPastInsertWithFutureOverlappingDeletes:
 
     def test_hazard_for_insert_with_future_overlapping_deletes(self):
-        doc = Document(snapshot='WfjxUPBNyE')
+        doc = _Document(snapshot='WfjxUPBNyE')
         doc.HAS_EVENT_LOOP = False
 
         # Both dd8 and 64d delete the string '7j'. That overlap must be relayed

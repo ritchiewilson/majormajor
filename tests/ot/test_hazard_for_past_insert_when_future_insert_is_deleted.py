@@ -27,7 +27,7 @@ TODO: This data was pulled from a failing random test. It is long, and hard to
 read.
 """
 
-from majormajor.document import Document
+from majormajor.document import _Document
 
 from tests.test_utils import build_changesets_from_tuples
 
@@ -35,7 +35,7 @@ from tests.test_utils import build_changesets_from_tuples
 class HazardForPastInsertWhenFutureInsertIsDeleted:
 
     def test_hazard_for_insert_when_future_insert_is_deleted(self):
-        doc = Document(snapshot='05IiYTALOC')
+        doc = _Document(snapshot='05IiYTALOC')
         doc.HAS_EVENT_LOOP = False
 
         css_data = [

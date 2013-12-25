@@ -21,7 +21,7 @@ import random
 
 from gi.repository import GObject
 
-from .document import Document
+from .document import _Document
 from .user import User
 from .message import Message
 
@@ -114,7 +114,7 @@ class MajorMajor:
         """
         if user is None:
             user = self.default_user
-        d = Document(doc_id, user, snapshot)
+        d = _Document(doc_id, user, snapshot)
         if not self.HAS_EVENT_LOOP:
             d.HAS_EVENT_LOOP = False
         self.documents.append(d)
